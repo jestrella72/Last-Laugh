@@ -1,0 +1,1978 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Last Laugh</title>
+  <style>
+    /* ── Reset & Base ─────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: #1a3a1a;
+      background-image:
+        radial-gradient(ellipse at top, #2a5a2a 0%, #1a3a1a 60%);
+      min-height: 100vh;
+      color: #f0f0e8;
+      user-select: none;
+    }
+
+    h1, h2, h3 { font-weight: 800; }
+
+    button {
+      cursor: pointer;
+      border: none;
+      border-radius: 8px;
+      font-size: 1rem;
+      font-weight: 700;
+      padding: 10px 20px;
+      transition: transform .1s, opacity .15s;
+    }
+    button:hover  { transform: translateY(-2px); }
+    button:active { transform: translateY(0); opacity: .85; }
+    button:disabled { opacity: .4; cursor: not-allowed; transform: none; }
+
+    /* ── Screens ──────────────────────────────────────── */
+    .screen { display: none; }
+    .screen.active { display: flex; flex-direction: column; align-items: center; }
+
+    /* ── SETUP SCREEN ────────────────────────────────── */
+    #setup-screen {
+      min-height: 100vh;
+      justify-content: center;
+      padding: 24px;
+      gap: 32px;
+    }
+
+    .setup-logo {
+      font-size: 3.5rem;
+      letter-spacing: -2px;
+      text-shadow: 3px 3px 0 #000;
+      color: #ffe066;
+      line-height: 1;
+    }
+
+    .setup-logo span { color: #ff6b35; }
+
+    .setup-box {
+      background: rgba(0,0,0,.45);
+      border-radius: 16px;
+      padding: 28px 36px;
+      width: 100%;
+      max-width: 700px;
+      text-align: center;
+    }
+
+    .setup-box h2 { font-size: 1.4rem; margin-bottom: 18px; color: #ffe066; }
+
+    .btn-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      justify-content: center;
+    }
+
+    .btn-count {
+      background: #ffe066;
+      color: #1a3a1a;
+      font-size: 1.3rem;
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .character-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+      gap: 12px;
+      margin-top: 16px;
+    }
+
+    .char-option {
+      background: rgba(255,255,255,.08);
+      border: 3px solid transparent;
+      border-radius: 12px;
+      padding: 8px;
+      cursor: pointer;
+      transition: border-color .15s, background .15s;
+      text-align: center;
+    }
+    .char-option:hover { border-color: #ffe066; background: rgba(255,224,102,.1); }
+    .char-option.taken { opacity: .3; pointer-events: none; }
+
+    .char-option img {
+      width: 100%;
+      aspect-ratio: 3/4;
+      object-fit: cover;
+      border-radius: 8px;
+      display: block;
+    }
+    .char-option .char-name {
+      font-size: .78rem;
+      font-weight: 700;
+      margin-top: 6px;
+      line-height: 1.2;
+    }
+    .char-option .char-ability {
+      font-size: .65rem;
+      opacity: .75;
+      margin-top: 4px;
+      line-height: 1.3;
+    }
+
+    .name-row {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 16px;
+      align-items: center;
+      justify-content: center;
+    }
+    .name-row input {
+      padding: 10px 14px;
+      border-radius: 8px;
+      border: 2px solid #555;
+      background: #111;
+      color: #fff;
+      font-size: 1rem;
+      width: 240px;
+    }
+    .name-row input:focus { outline: none; border-color: #ffe066; }
+
+    .btn-primary { background: #ffe066; color: #1a3a1a; }
+    .btn-danger  { background: #e84040; color: #fff; }
+    .btn-safe    { background: #40c060; color: #fff; }
+    .btn-neutral { background: #607080; color: #fff; }
+    .btn-ability { background: #9b59b6; color: #fff; }
+    .btn-small   { padding: 6px 14px; font-size: .85rem; }
+
+    /* ── GAME SCREEN ─────────────────────────────────── */
+    #game-screen {
+      padding: 0;
+      min-height: 100vh;
+    }
+
+    /* Players bar */
+    #players-bar {
+      display: flex;
+      gap: 8px;
+      padding: 10px 12px;
+      background: rgba(0,0,0,.5);
+      overflow-x: auto;
+      width: 100%;
+      flex-wrap: wrap;
+    }
+
+    .player-chip {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      background: rgba(255,255,255,.07);
+      border: 2px solid transparent;
+      border-radius: 10px;
+      padding: 6px 10px;
+      min-width: 90px;
+      transition: border-color .2s;
+      position: relative;
+    }
+    .player-chip.active-player  { border-color: #ffe066; }
+    .player-chip.danger-target  { border-color: #e84040; }
+    .player-chip.eliminated { opacity: .3; }
+
+    .chip-char-img {
+      width: 40px;
+      height: 52px;
+      object-fit: cover;
+      border-radius: 5px;
+    }
+    .chip-name {
+      font-size: .75rem;
+      font-weight: 700;
+      margin-top: 4px;
+      text-align: center;
+      max-width: 80px;
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+    }
+    .chip-lives { font-size: .9rem; }
+    .chip-ability-pips { font-size: .65rem; color: #9b59b6; }
+    .chip-hand-count   { font-size: .65rem; color: #aaa; }
+
+    /* Center area */
+    #game-center {
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      gap: 20px;
+      padding: 16px 12px;
+      flex-wrap: wrap;
+    }
+
+    .deck-zone {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+    }
+    .deck-zone label {
+      font-size: .7rem;
+      font-weight: 700;
+      letter-spacing: 1px;
+      opacity: .7;
+      text-transform: uppercase;
+    }
+    .deck-count { font-size: .8rem; opacity: .6; }
+
+    /* Card display */
+    .card-img {
+      width: 110px;
+      height: 154px;
+      border-radius: 10px;
+      object-fit: cover;
+      box-shadow: 0 4px 12px rgba(0,0,0,.5);
+      border: 2px solid rgba(255,255,255,.15);
+    }
+    .card-img.large {
+      width: 170px;
+      height: 238px;
+    }
+    .card-img.clickable { cursor: pointer; transition: transform .15s; }
+    .card-img.clickable:hover { transform: scale(1.05); }
+
+    #current-danger-zone {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+    }
+    #danger-label {
+      font-size: .7rem;
+      font-weight: 700;
+      letter-spacing: 1px;
+      opacity: .7;
+      text-transform: uppercase;
+    }
+    #danger-effect-text {
+      max-width: 200px;
+      font-size: .75rem;
+      text-align: center;
+      background: rgba(0,0,0,.4);
+      border-radius: 8px;
+      padding: 6px 10px;
+      line-height: 1.4;
+      color: #ffd;
+    }
+
+    /* Game log */
+    #game-log {
+      width: 100%;
+      max-width: 600px;
+      max-height: 90px;
+      overflow-y: auto;
+      padding: 6px 14px;
+      font-size: .75rem;
+      line-height: 1.6;
+      opacity: .8;
+      border-top: 1px solid rgba(255,255,255,.1);
+    }
+    #game-log .log-entry { padding: 1px 0; }
+    #game-log .log-entry:first-child { color: #ffe066; }
+
+    /* ── MAIN ACTION PANEL ───────────────────────────── */
+    #action-panel {
+      width: 100%;
+      background: rgba(0,0,0,.55);
+      border-top: 1px solid rgba(255,255,255,.12);
+      padding: 14px 14px 18px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 14px;
+    }
+
+    #action-panel-title {
+      font-size: 1.05rem;
+      font-weight: 800;
+      text-align: center;
+      color: #ffe066;
+    }
+    #action-panel-subtitle {
+      font-size: .82rem;
+      text-align: center;
+      opacity: .8;
+      max-width: 500px;
+    }
+
+    #action-buttons-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      justify-content: center;
+    }
+
+    /* Hand display */
+    #hand-display {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      justify-content: center;
+      max-width: 100%;
+      padding: 4px 0;
+    }
+
+    .hand-card {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      cursor: pointer;
+      transition: transform .15s;
+    }
+    .hand-card:hover .card-img { transform: translateY(-8px); }
+    .hand-card .card-name {
+      font-size: .68rem;
+      font-weight: 700;
+      text-align: center;
+      max-width: 100px;
+    }
+    .hand-card.selected .card-img {
+      border: 3px solid #ffe066;
+      transform: translateY(-8px);
+    }
+    .hand-card.disabled { opacity: .35; pointer-events: none; }
+
+    /* ── MODAL ───────────────────────────────────────── */
+    #modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.75);
+      z-index: 100;
+      justify-content: center;
+      align-items: center;
+      padding: 20px;
+    }
+    #modal-overlay.open { display: flex; }
+
+    #modal-box {
+      background: #1e3a2e;
+      border: 2px solid rgba(255,224,102,.3);
+      border-radius: 16px;
+      padding: 24px;
+      max-width: 480px;
+      width: 100%;
+      text-align: center;
+      max-height: 90vh;
+      overflow-y: auto;
+    }
+    #modal-box h3 { color: #ffe066; margin-bottom: 8px; font-size: 1.2rem; }
+    #modal-box p  { font-size: .9rem; opacity: .85; margin-bottom: 16px; line-height: 1.5; }
+
+    #modal-card-row {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: center;
+      margin: 12px 0;
+    }
+
+    #modal-buttons {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      justify-content: center;
+      margin-top: 14px;
+    }
+
+    /* Die display */
+    .die-display {
+      font-size: 3.5rem;
+      margin: 8px 0;
+      animation: dieRoll .4s;
+    }
+    @keyframes dieRoll {
+      0%   { transform: rotate(0deg)   scale(.5); opacity: 0; }
+      60%  { transform: rotate(200deg) scale(1.2); }
+      100% { transform: rotate(0deg)   scale(1); opacity: 1; }
+    }
+
+    /* Life hearts */
+    .hearts { font-size: 1rem; letter-spacing: 1px; }
+
+    /* Pass-to screen */
+    #pass-screen {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: #0a1a0a;
+      z-index: 200;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 20px;
+      text-align: center;
+      padding: 24px;
+    }
+    #pass-screen.open { display: flex; }
+    #pass-screen h2 { font-size: 2rem; color: #ffe066; }
+    #pass-screen p  { opacity: .75; font-size: 1rem; max-width: 340px; }
+
+    /* Winner screen */
+    #winner-screen {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.9);
+      z-index: 300;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 20px;
+      text-align: center;
+      padding: 24px;
+    }
+    #winner-screen.open { display: flex; }
+    #winner-screen h1 { font-size: 3rem; color: #ffe066; }
+    #winner-screen .winner-char { width: 160px; height: 210px; object-fit: cover; border-radius: 12px; }
+
+    /* Responsive */
+    @media (max-width: 500px) {
+      .card-img.large { width: 130px; height: 182px; }
+      .card-img { width: 85px; height: 119px; }
+      .setup-logo { font-size: 2.5rem; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════════
+     SETUP SCREEN
+══════════════════════════════════════════ -->
+<div id="setup-screen" class="screen active">
+  <div class="setup-logo">LAST <span>LAUGH</span></div>
+
+  <div class="setup-box" id="setup-count-box">
+    <h2>How many players?</h2>
+    <div class="btn-row">
+      <button class="btn-count" onclick="initSetup(2)">2</button>
+      <button class="btn-count" onclick="initSetup(3)">3</button>
+      <button class="btn-count" onclick="initSetup(4)">4</button>
+      <button class="btn-count" onclick="initSetup(5)">5</button>
+      <button class="btn-count" onclick="initSetup(6)">6</button>
+    </div>
+  </div>
+
+  <div class="setup-box" id="setup-char-box" style="display:none">
+    <h2 id="setup-char-title">Player 1 — Enter your name</h2>
+    <div class="name-row">
+      <input id="player-name-input" type="text" placeholder="Your name…" maxlength="16"
+             onkeydown="if(event.key==='Enter')confirmCharacter()">
+    </div>
+    <p style="font-size:.8rem;opacity:.7;margin-bottom:12px;">Choose your character:</p>
+    <div class="character-grid" id="char-grid"></div>
+    <div style="margin-top:18px">
+      <button class="btn-primary" onclick="confirmCharacter()">Confirm →</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     MAIN GAME SCREEN
+══════════════════════════════════════════ -->
+<div id="game-screen" class="screen">
+
+  <!-- Players bar -->
+  <div id="players-bar"></div>
+
+  <!-- Center: decks + active danger -->
+  <div id="game-center">
+    <div class="deck-zone">
+      <label>Danger Deck</label>
+      <img id="danger-deck-img" src="1.png" alt="Danger deck"
+           class="card-img clickable" onclick="onFlipDangerClick()" title="Flip danger card">
+      <div class="deck-count" id="danger-deck-count">36 cards</div>
+    </div>
+
+    <div id="current-danger-zone">
+      <div id="danger-label">— No Danger —</div>
+      <img id="current-danger-img" src="1.png" alt="" class="card-img large"
+           style="visibility:hidden">
+      <div id="danger-effect-text" style="display:none"></div>
+    </div>
+
+    <div class="deck-zone">
+      <label>Action Deck</label>
+      <img src="1.png" alt="Action deck" class="card-img">
+      <div class="deck-count" id="action-deck-count">50 cards</div>
+      <div style="margin-top:6px">
+        <div style="font-size:.65rem;opacity:.6;text-align:center">Discard</div>
+        <img id="action-discard-img" src="1.png" alt="Discard"
+             class="card-img" style="opacity:.5;margin-top:4px">
+      </div>
+    </div>
+  </div>
+
+  <!-- Log -->
+  <div id="game-log"></div>
+
+  <!-- Main action panel (changes each phase) -->
+  <div id="action-panel">
+    <div id="action-panel-title"></div>
+    <div id="action-panel-subtitle"></div>
+    <div id="action-buttons-row"></div>
+    <div id="hand-display"></div>
+  </div>
+</div>
+
+<!-- Pass-to screen (privacy / hotseat separator) -->
+<div id="pass-screen">
+  <div style="font-size:3rem">🃏</div>
+  <h2 id="pass-to-name">Player 1's Turn</h2>
+  <p id="pass-to-msg">Pass the device to this player, then tap to continue.</p>
+  <button class="btn-primary" style="font-size:1.2rem;padding:14px 36px"
+          onclick="dismissPassScreen()">I'm Ready</button>
+</div>
+
+<!-- Winner screen -->
+<div id="winner-screen">
+  <div style="font-size:3rem">🏆</div>
+  <h1 id="winner-title">Winner!</h1>
+  <img id="winner-char-img" src="1.png" class="winner-char" alt="">
+  <p id="winner-msg"></p>
+  <button class="btn-primary" onclick="location.reload()">Play Again</button>
+</div>
+
+<!-- Modal -->
+<div id="modal-overlay">
+  <div id="modal-box">
+    <h3 id="modal-title"></h3>
+    <p  id="modal-body"></p>
+    <div id="modal-card-row"></div>
+    <div id="modal-buttons"></div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     SCRIPTS
+══════════════════════════════════════════ -->
+<script src="cards.js"></script>
+<script src="game.js"></script>
+<script>
+// =============================================================
+//  UI CONTROLLER
+//  OOP LESSON: This is procedural code that USES our OOP
+//  classes. Notice how clean it reads: G.currentPlayer,
+//  G.rollDie(), player.loseLife() — the classes handle
+//  all the messy details, the controller just orchestrates.
+// =============================================================
+
+let G = null;  // The Game instance (our source of truth)
+
+// ── Setup state ──────────────────────────────────────────────
+let setupCount       = 0;
+let setupPlayers     = [];
+let setupIdx         = 0;
+let setupCharChosen  = null;
+let takenCharIds     = [];
+
+// ── Reaction queue ────────────────────────────────────────────
+// After danger is flipped, we walk each player through a
+// reaction opportunity before resolving.
+let reactionQueue   = [];   // [{playerIdx}]
+let pendingCallback = null; // resolve() from a promise, or null
+
+// ── Phase labels ─────────────────────────────────────────────
+// 'pre_flip'  | 'reacting'  | 'resolving_*' | 'game_over'
+
+// =============================================================
+//  SETUP
+// =============================================================
+
+function initSetup(n) {
+  setupCount      = n;
+  setupPlayers    = [];
+  setupIdx        = 0;
+  takenCharIds    = [];
+  setupCharChosen = null;
+  document.getElementById('setup-count-box').style.display = 'none';
+  document.getElementById('setup-char-box').style.display  = 'block';
+  renderCharSelect();
+}
+
+function renderCharSelect() {
+  document.getElementById('setup-char-title').textContent =
+    `Player ${setupIdx + 1} — Enter your name`;
+  document.getElementById('player-name-input').value = '';
+  setupCharChosen = null;
+
+  const grid = document.getElementById('char-grid');
+  grid.innerHTML = '';
+  CHARACTER_CARDS.forEach(c => {
+    const div = document.createElement('div');
+    div.className = 'char-option' + (takenCharIds.includes(c.id) ? ' taken' : '');
+    div.onclick   = () => {
+      document.querySelectorAll('.char-option').forEach(el => el.style.borderColor = '');
+      div.style.borderColor = '#ffe066';
+      setupCharChosen = c;
+    };
+    div.innerHTML = `
+      <img src="${c.image}" alt="${c.name}">
+      <div class="char-name">${c.name}</div>
+      <div class="char-ability">${c.abilityText}</div>`;
+    grid.appendChild(div);
+  });
+
+  setTimeout(() => document.getElementById('player-name-input').focus(), 100);
+}
+
+function confirmCharacter() {
+  const rawName = document.getElementById('player-name-input').value.trim();
+  if (!rawName) { alert('Please enter a name!'); return; }
+  if (!setupCharChosen) { alert('Please choose a character!'); return; }
+
+  setupPlayers.push({ name: rawName, character: setupCharChosen });
+  takenCharIds.push(setupCharChosen.id);
+  setupIdx++;
+
+  if (setupIdx >= setupCount) {
+    startGame();
+  } else {
+    renderCharSelect();
+  }
+}
+
+function startGame() {
+  G = new Game(setupPlayers);
+  showScreen('game-screen');
+  renderBoard();
+  showPassScreen();
+}
+
+// =============================================================
+//  SCREEN HELPERS
+// =============================================================
+
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+function showPassScreen() {
+  const p = G.currentPlayer;
+  document.getElementById('pass-to-name').textContent = `${p.name}'s Turn!`;
+  document.getElementById('pass-to-msg').textContent  =
+    `Pass the device to ${p.name}, then tap when ready.`;
+  document.getElementById('pass-screen').classList.add('open');
+}
+
+function dismissPassScreen() {
+  document.getElementById('pass-screen').classList.remove('open');
+  startPreFlipPhase();
+}
+
+// =============================================================
+//  BOARD RENDERING
+// =============================================================
+
+function renderBoard() {
+  renderPlayersBar();
+  updateDeckCounts();
+  renderLog();
+}
+
+function renderPlayersBar() {
+  const bar = document.getElementById('players-bar');
+  bar.innerHTML = '';
+  G.players.forEach((p, i) => {
+    const hearts = heartsStr(p.lives, p.maxLives);
+    const pips   = '◆'.repeat(p.abilitiesLeft) + '◇'.repeat(3 - p.abilitiesLeft);
+    const chip   = document.createElement('div');
+    chip.className = 'player-chip' +
+      (i === G.currentPlayerIdx ? ' active-player' : '') +
+      (i === G.dangerTargetIdx && G.currentDanger ? ' danger-target' : '') +
+      (p.isEliminated ? ' eliminated' : '');
+    chip.innerHTML = `
+      <img src="${p.character.image}" class="chip-char-img" alt="${p.character.name}">
+      <div class="chip-name">${p.name}</div>
+      <div class="chip-lives hearts">${hearts}</div>
+      <div class="chip-ability-pips">${pips}</div>
+      <div class="chip-hand-count">🃏 ${p.hand.length}</div>`;
+    bar.appendChild(chip);
+  });
+}
+
+function heartsStr(lives, max) {
+  return '❤️'.repeat(lives) + '🖤'.repeat(Math.max(0, max - lives));
+}
+
+function updateDeckCounts() {
+  document.getElementById('danger-deck-count').textContent = `${G.dangerDeck.size} cards`;
+  document.getElementById('action-deck-count').textContent = `${G.actionDeck.size} cards`;
+  const topDiscard = G.actionDeck.getTopDiscard();
+  const discImg    = document.getElementById('action-discard-img');
+  discImg.src      = topDiscard ? topDiscard.image : '1.png';
+  discImg.style.opacity = topDiscard ? '1' : '.3';
+}
+
+function showDangerCard(card) {
+  document.getElementById('danger-label').textContent = '⚠️  DANGER CARD';
+  const img = document.getElementById('current-danger-img');
+  img.src = card.image;
+  img.style.visibility = 'visible';
+  const eff = document.getElementById('danger-effect-text');
+  eff.textContent = card.effectText;
+  eff.style.display = 'block';
+}
+
+function hideDangerCard() {
+  document.getElementById('danger-label').textContent     = '— No Danger —';
+  document.getElementById('current-danger-img').style.visibility = 'hidden';
+  document.getElementById('danger-effect-text').style.display = 'none';
+}
+
+function renderLog() {
+  const log = document.getElementById('game-log');
+  log.innerHTML = G.log.slice(0, 8).map(e =>
+    `<div class="log-entry">${e.text}</div>`).join('');
+}
+
+// ── Action Panel helpers ──────────────────────────────────────
+
+function setPanel(title, subtitle, buttons = [], hand = [], handFilter = null) {
+  document.getElementById('action-panel-title').textContent    = title;
+  document.getElementById('action-panel-subtitle').textContent = subtitle;
+
+  const btnRow = document.getElementById('action-buttons-row');
+  btnRow.innerHTML = '';
+  buttons.forEach(({label, cls, fn, disabled}) => {
+    const b = document.createElement('button');
+    b.textContent = label;
+    b.className   = cls || 'btn-neutral';
+    b.disabled    = !!disabled;
+    b.onclick     = fn;
+    btnRow.appendChild(b);
+  });
+
+  const handDiv = document.getElementById('hand-display');
+  handDiv.innerHTML = '';
+  hand.forEach(card => {
+    const playable = handFilter ? handFilter(card) : true;
+    const div      = document.createElement('div');
+    div.className  = 'hand-card' + (playable ? '' : ' disabled');
+    div.innerHTML  = `<img src="${card.image}" class="card-img" alt="${card.name}">
+                      <div class="card-name">${card.name}</div>`;
+    if (playable) div.onclick = () => onHandCardClick(card);
+    handDiv.appendChild(div);
+  });
+}
+
+// =============================================================
+//  PRE-FLIP PHASE
+//  Active player can play "your_turn" cards or flip danger.
+// =============================================================
+
+function startPreFlipPhase() {
+  G.addLog(`— Turn ${G.turn}: ${G.currentPlayer.name}'s turn —`);
+  renderBoard();
+  const p = G.currentPlayer;
+
+  // Make the danger deck card clickable
+  document.getElementById('danger-deck-img').style.filter = 'none';
+
+  const preFlipCards = p.hand.filter(c =>
+    c.timing === 'your_turn' && !['a_slip'].includes(c.id)
+  );
+
+  setPanel(
+    `${p.name}'s Turn`,
+    `Play Action cards before flipping, or flip the Danger card to begin.`,
+    [
+      { label: '🃏 Show My Hand', cls: 'btn-neutral', fn: () => toggleHandDisplay() },
+      { label: `Flip Danger Card ⚠️`,  cls: 'btn-danger',  fn: () => flipDanger() },
+    ],
+    [],
+  );
+}
+
+let handVisible = false;
+function toggleHandDisplay() {
+  handVisible = !handVisible;
+  if (handVisible) {
+    const p = G.currentPlayer;
+    setPanel(
+      `${p.name}'s Hand`,
+      `Click a card to play it, or Flip the Danger Card when ready.`,
+      [
+        { label: 'Hide Hand',            cls: 'btn-neutral', fn: () => { handVisible=false; startPreFlipPhase(); } },
+        { label: 'Flip Danger Card ⚠️', cls: 'btn-danger',  fn: () => flipDanger() },
+        ...(p.canUseAbility() && ['active','any_time'].includes(p.character.abilityTiming)
+          ? [{ label: `✨ Use Ability (${p.abilitiesLeft} left)`, cls: 'btn-ability', fn: () => useCharacterAbility(p) }]
+          : [])
+      ],
+      p.hand,
+      // Pre-flip: allow your_turn cards + any_time cards (except Not Today — no danger yet)
+      c => c.timing === 'your_turn' || (c.canPlayAnytime && c.id !== 'a_not_today')
+    );
+  } else {
+    startPreFlipPhase();
+  }
+}
+
+function onFlipDangerClick() {
+  if (G.currentDanger) return; // already flipped
+  flipDanger();
+}
+
+// =============================================================
+//  FLIP DANGER CARD
+// =============================================================
+
+function flipDanger() {
+  handVisible = false;
+  const card = G.dangerDeck.draw();
+  if (!card) {
+    G.addLog('Danger deck is empty! Shuffling discard back in…');
+    // Simple: just end this turn
+    endTurnCleanup();
+    return;
+  }
+
+  G.currentDanger    = card;
+  G.dangerTargetIdx  = G.currentPlayerIdx;
+  G.safetyFirstActive = false;
+  G.dangerNegated     = false;
+
+  G.addLog(`${G.currentPlayer.name} flipped: ${card.name}`);
+  showDangerCard(card);
+  renderBoard();
+
+  // Build reaction queue: active player first, then clockwise
+  reactionQueue = [];
+  let idx = G.currentPlayerIdx;
+  for (let i = 0; i < G.players.length; i++) {
+    if (!G.players[idx].isEliminated) {
+      reactionQueue.push(idx);
+    }
+    idx = (idx + 1) % G.players.length;
+  }
+
+  processNextReaction();
+}
+
+// =============================================================
+//  REACTION PHASE
+//  Each player (in turn order) may play any_time action cards
+//  or use any_time abilities before resolution.
+// =============================================================
+
+function processNextReaction() {
+  if (reactionQueue.length === 0) {
+    resolveDanger();
+    return;
+  }
+  const reactorIdx = reactionQueue.shift();
+  const reactor    = G.players[reactorIdx];
+
+  // Filter cards that can be played in reaction
+  // Note: if danger is unstoppable, only Slip Away + Redirect allowed
+  const danger      = G.currentDanger;
+  // Active player (danger target) can also play Slip Away during reactions
+  const isTarget = reactorIdx === G.dangerTargetIdx;
+  const playable = reactor.hand.filter(c => {
+    if (!c.canPlayAnytime && !(isTarget && c.id === 'a_slip')) return false;
+    if (danger.unstoppable && !['a_slip','a_redirect'].includes(c.id)) return false;
+    return true;
+  });
+
+  // Also check any_time abilities
+  const hasAbility  = reactor.canUseAbility() && reactor.character.abilityTiming === 'any_time';
+
+  // Show pass screen if switching players
+  if (reactorIdx !== G.currentPlayerIdx) {
+    showReactionPassScreen(reactor, () => showReactionPanel(reactorIdx, playable, hasAbility));
+  } else {
+    showReactionPanel(reactorIdx, playable, hasAbility);
+  }
+}
+
+function showReactionPassScreen(player, callback) {
+  pendingCallback = callback;
+  document.getElementById('pass-to-name').textContent = `${player.name} — React?`;
+  document.getElementById('pass-to-msg').textContent  =
+    `Pass to ${player.name}. They may play a reaction card, or pass.`;
+  document.getElementById('pass-screen').classList.add('open');
+  // Override dismiss button temporarily
+  document.querySelector('#pass-screen button').onclick = () => {
+    document.getElementById('pass-screen').classList.remove('open');
+    document.querySelector('#pass-screen button').onclick = dismissPassScreen;
+    if (pendingCallback) { pendingCallback(); pendingCallback = null; }
+  };
+}
+
+function showReactionPanel(reactorIdx, playable, hasAbility) {
+  const reactor = G.players[reactorIdx];
+  const target  = G.dangerTarget;
+
+  const btns = [
+    {
+      label: 'Pass (No Reaction)',
+      cls:   'btn-neutral',
+      fn:    () => processNextReaction()
+    },
+    ...(hasAbility ? [{
+      label: `✨ Use Ability (${reactor.abilitiesLeft} left)`,
+      cls:   'btn-ability',
+      fn:    () => useCharacterAbilityReaction(reactorIdx)
+    }] : [])
+  ];
+
+  const dangerInfo = G.currentDanger;
+  setPanel(
+    `${reactor.name} — React?`,
+    `Danger: "${dangerInfo.name}" targets ${target.name}. Play a card or pass.`,
+    btns,
+    reactor.hand,
+    c => {
+      const isTargetPlayer = reactorIdx === G.dangerTargetIdx;
+      if (!c.canPlayAnytime && !(isTargetPlayer && c.id === 'a_slip')) return false;
+      if (dangerInfo.unstoppable && !['a_slip','a_redirect'].includes(c.id)) return false;
+      return true;
+    }
+  );
+
+  // Stash reactor index for onHandCardClick
+  window._currentReactorIdx = reactorIdx;
+}
+
+// =============================================================
+//  HAND CARD CLICK (context-sensitive)
+// =============================================================
+
+function onHandCardClick(card) {
+  const reactorIdx = window._currentReactorIdx ?? G.currentPlayerIdx;
+  const reactor    = G.players[reactorIdx];
+
+  switch (card.id) {
+    // ── Any-time reaction cards ────────────────────────────
+    case 'a_not_today':
+      if (G.currentDanger && G.currentDanger.unstoppable) {
+        showInfo('Blocked!', 'Not Today! cannot stop this Danger card.');
+        return;
+      }
+      playNotToday(reactor, card);
+      break;
+
+    case 'a_redirect':
+      playRedirect(reactor, card);
+      break;
+
+    case 'a_second_chance':
+      playSecondChance(reactor, card);
+      break;
+
+    case 'a_cancel':
+      playCancel(reactor, card);
+      break;
+
+    case 'a_skip':
+      playSkipTurn(reactor, card);
+      break;
+
+    case 'a_double':
+      playDoubleTrouble(reactor, card);
+      break;
+
+    // ── Your-turn cards ────────────────────────────────────
+    case 'a_slip':
+      playSlipAway(reactor, card);
+      break;
+
+    case 'a_safety':
+      playSafetyFirst(reactor, card);
+      break;
+
+    case 'a_draw2':
+      playDraw2(reactor, card);
+      break;
+
+    case 'a_take1':
+      playTake1(reactor, card);
+      break;
+
+    case 'a_swap':
+      playSwapHands(reactor, card);
+      break;
+
+    case 'a_peek':
+      playPeekAhead(reactor, card);
+      break;
+
+    case 'a_recover':
+      playRecover(reactor, card);
+      break;
+
+    default:
+      showInfo('Card', `${card.name}: ${card.effectText}`);
+  }
+}
+
+// ── Helper: discard from hand, log it ────────────────────────
+function discardFromHand(player, card) {
+  player.removeFromHand(card.instanceId);
+  G.actionDeck.discard(card);
+  G.addLog(`${player.name} played ${card.name}`);
+  updateDeckCounts();
+}
+
+// =============================================================
+//  ACTION CARD IMPLEMENTATIONS
+// =============================================================
+
+// Not Today! — negate the danger for the target
+function playNotToday(player, card) {
+  discardFromHand(player, card);
+  G.dangerNegated = true;
+  // Move the danger card to discard
+  G.dangerDeck.discard(G.currentDanger);
+  G.addLog(`${player.name} played NOT TODAY! — Danger negated!`);
+  showInfo('Not Today!', `${player.name} avoided the danger entirely!`, () => {
+    afterDangerResolved(G.dangerTarget);
+  });
+}
+
+// Redirect — pick a different player to face the danger
+function playRedirect(player, card) {
+  const others = G.players.filter(p => !p.isEliminated && p.id !== G.dangerTargetIdx);
+  if (others.length === 0) { showInfo('Redirect', 'No other players to redirect to!'); return; }
+  discardFromHand(player, card);
+  pickPlayer(
+    'Redirect — Choose Target',
+    'Who must face the Danger card instead?',
+    others,
+    (target) => {
+      G.dangerTargetIdx = target.id;
+      G.addLog(`${player.name} redirected to ${target.name}!`);
+      renderBoard();
+      showInfo('Redirected!', `The Danger now targets ${target.name}!`, () => processNextReaction());
+    }
+  );
+}
+
+// Second Chance — survive without losing a life
+function playSecondChance(player, card) {
+  discardFromHand(player, card);
+  G.addLog(`${player.name} used Second Chance on ${G.dangerTarget.name}!`);
+  showInfo('Second Chance!', `${G.dangerTarget.name} survives the danger!`, () => {
+    afterDangerResolved(G.dangerTarget);
+  });
+}
+
+// Slip Away — pass danger to player on left
+function playSlipAway(player, card) {
+  if (G.currentDanger && !G.currentDanger) return; // shouldn't happen
+  discardFromHand(player, card);
+  const leftIdx  = G.playerToLeft(G.dangerTargetIdx);
+  const leftPlayer = G.players[leftIdx];
+  G.dangerTargetIdx = leftIdx;
+  G.addLog(`${player.name} slipped away! Danger passes to ${leftPlayer.name}!`);
+  renderBoard();
+  showInfo('Slip Away!', `The Danger now targets ${leftPlayer.name}!`, () => processNextReaction());
+}
+
+// Safety First — everyone is safe this round
+function playSafetyFirst(player, card) {
+  discardFromHand(player, card);
+  G.safetyFirstActive = true;
+  G.addLog(`${player.name} played Safety First — no one loses a life this round!`);
+  showInfo('Safety First!', 'Nobody loses a life this round!', () => {
+    afterDangerResolved(G.dangerTarget);
+  });
+}
+
+// Draw 2
+function playDraw2(player, card) {
+  discardFromHand(player, card);
+  const drawn = G.actionDeck.drawMany(2);
+  player.hand.push(...drawn);
+  G.addLog(`${player.name} drew 2 cards.`);
+  renderBoard();
+  showInfo('Draw 2', `${player.name} drew 2 Action cards!`, () => {
+    if (G.currentDanger) {
+      startPreFlipPhase(); // still pre-flip if no danger yet
+    } else {
+      startPreFlipPhase();
+    }
+  });
+}
+
+// Peek Ahead — look at top 3 danger cards and rearrange
+function playPeekAhead(player, card) {
+  discardFromHand(player, card);
+  const top = G.dangerDeck.peekTop(3);
+  if (top.length === 0) { showInfo('Peek Ahead', 'The Danger deck is empty!'); return; }
+
+  let order = top.map((_, i) => i);
+  const cardRow = document.getElementById('modal-card-row');
+
+  showModal(
+    'Peek Ahead',
+    `${player.name} sees the top ${top.length} Danger cards. Drag to rearrange, or click Confirm.`,
+    () => {
+      // Read current order from DOM
+      const imgs = cardRow.querySelectorAll('img');
+      const newOrder = Array.from(imgs).map(img => parseInt(img.dataset.origIdx));
+      G.dangerDeck.rearrangeTop(newOrder);
+      G.addLog(`${player.name} peeked and rearranged the Danger deck!`);
+      closeModal();
+      startPreFlipPhase();
+    }
+  );
+
+  cardRow.innerHTML = '';
+  top.forEach((c, i) => {
+    const img = document.createElement('img');
+    img.src          = c.image;
+    img.alt          = c.name;
+    img.className    = 'card-img clickable';
+    img.dataset.origIdx = i;
+    img.title        = c.name + ' — click arrows to move';
+    cardRow.appendChild(img);
+  });
+
+  // Simple up/down buttons for rearranging
+  const btnRow = document.getElementById('modal-buttons');
+  btnRow.innerHTML = '';
+  const info = document.createElement('p');
+  info.style.fontSize = '.75rem';
+  info.style.opacity  = '.7';
+  info.textContent    = 'Cards shown left→right = top→bottom of deck.';
+  document.getElementById('modal-box').insertBefore(info, btnRow);
+  const conf = document.createElement('button');
+  conf.textContent = 'Confirm Order ✓';
+  conf.className   = 'btn-primary';
+  conf.onclick     = () => {
+    const imgs     = cardRow.querySelectorAll('img');
+    const newOrder = Array.from(imgs).map(img => parseInt(img.dataset.origIdx));
+    G.dangerDeck.rearrangeTop(newOrder);
+    G.addLog(`${player.name} rearranged the Danger deck!`);
+    closeModal();
+    if (G.currentDanger) processNextReaction(); else startPreFlipPhase();
+  };
+  btnRow.appendChild(conf);
+
+  // Enable drag on cards
+  enableCardDrag(cardRow);
+}
+
+function enableCardDrag(container) {
+  let dragEl = null;
+  container.querySelectorAll('img').forEach(img => {
+    img.draggable = true;
+    img.addEventListener('dragstart', e => { dragEl = img; img.style.opacity = '.4'; });
+    img.addEventListener('dragend',   e => { img.style.opacity = '1'; dragEl = null; });
+    img.addEventListener('dragover',  e => { e.preventDefault(); });
+    img.addEventListener('drop',      e => {
+      e.preventDefault();
+      if (dragEl && dragEl !== img) {
+        const parent = container;
+        const nodes  = [...parent.children];
+        const fromI  = nodes.indexOf(dragEl);
+        const toI    = nodes.indexOf(img);
+        if (fromI < toI) parent.insertBefore(dragEl, img.nextSibling);
+        else             parent.insertBefore(dragEl, img);
+      }
+    });
+  });
+}
+
+// Take 1 — steal a random card from a target
+function playTake1(player, card) {
+  const others = G.players.filter(p => !p.isEliminated && p.id !== player.id && p.hand.length > 0);
+  if (others.length === 0) { showInfo('Take 1', 'No players have cards to steal!'); return; }
+  discardFromHand(player, card);
+  pickPlayer(
+    'Take 1 — Choose Target',
+    'Steal 1 random card from which player?',
+    others,
+    (target) => {
+      // Lucky Luke ability check
+      if (target.character.id === 'c_luke' && target.canUseAbility()) {
+        showConfirm(
+          'Lucky Luke!',
+          `${target.name} is Lucky Luke! They can roll to cancel this. Use ability?`,
+          () => {
+            target.useAbility();
+            const roll = Game.rollDie();
+            G.addLog(`${target.name} rolled a ${roll} against Take 1.`);
+            showDieResult(roll, () => {
+              if (roll >= 4) {
+                showInfo('Lucky!', `${target.name} rolled ${roll} — Take 1 cancelled!`, () => {
+                  if (G.currentDanger) processNextReaction(); else startPreFlipPhase();
+                });
+              } else {
+                doTake1(player, target);
+              }
+            });
+          },
+          () => doTake1(player, target)
+        );
+      } else {
+        doTake1(player, target);
+      }
+    }
+  );
+}
+function doTake1(player, target) {
+  const stolen = target.stealRandomCard();
+  if (stolen) {
+    player.hand.push(stolen);
+    G.addLog(`${player.name} stole a card from ${target.name}!`);
+  }
+  renderBoard();
+  showInfo('Take 1!', `${player.name} stole a card from ${target.name}!`, () => {
+    if (G.currentDanger) processNextReaction(); else startPreFlipPhase();
+  });
+}
+
+// Swap Hands
+function playSwapHands(player, card) {
+  const others = G.players.filter(p => !p.isEliminated && p.id !== player.id);
+  if (others.length === 0) return;
+  discardFromHand(player, card);
+  pickPlayer(
+    'Swap Hands',
+    `${player.name} swaps their entire hand with…`,
+    others,
+    (target) => {
+      const temp    = player.hand;
+      player.hand   = target.hand;
+      target.hand   = temp;
+      G.addLog(`${player.name} swapped hands with ${target.name}!`);
+      renderBoard();
+      showInfo('Hands Swapped!', `${player.name} and ${target.name} swapped hands!`, () => {
+        if (G.currentDanger) processNextReaction(); else startPreFlipPhase();
+      });
+    }
+  );
+}
+
+// Recover — pick from action discard, discard one from hand
+function playRecover(player, card) {
+  const discards = G.actionDeck.getAllDiscards();
+  if (discards.length === 0) { showInfo('Recover', 'The Action discard pile is empty!'); return; }
+  discardFromHand(player, card);
+
+  const modal = document.getElementById('modal-box');
+  showModal('Recover', 'Choose 1 card from the discard pile to take back:');
+  const row = document.getElementById('modal-card-row');
+  row.innerHTML = '';
+  discards.forEach(c => {
+    const img   = document.createElement('img');
+    img.src     = c.image;
+    img.alt     = c.name;
+    img.className = 'card-img clickable';
+    img.title   = c.name;
+    img.onclick = () => {
+      const recovered = G.actionDeck.recoverFromDiscard(c.instanceId);
+      if (recovered) {
+        player.hand.push(recovered);
+        G.addLog(`${player.name} recovered ${recovered.name} from discard.`);
+        closeModal();
+        // Now discard one from hand
+        if (player.hand.length > 1) {
+          pickCardFromHand(player, 'Recover — Discard 1', 'Choose 1 card from your hand to discard:', () => {
+            renderBoard();
+            if (G.currentDanger) processNextReaction(); else startPreFlipPhase();
+          }, true);
+        } else {
+          renderBoard();
+          if (G.currentDanger) processNextReaction(); else startPreFlipPhase();
+        }
+      }
+    };
+    row.appendChild(img);
+  });
+}
+
+// Skip Turn
+function playSkipTurn(player, card) {
+  const others = G.players.filter(p => !p.isEliminated);
+  discardFromHand(player, card);
+  pickPlayer(
+    'Skip Your Turn',
+    'Whose turn should be skipped? (Can be yourself.)',
+    others,
+    (target) => {
+      target.skipNextTurn = true;
+      G.addLog(`${player.name} will skip ${target.name}'s next turn!`);
+      renderBoard();
+      showInfo('Skip Turn!', `${target.name}'s next turn will be skipped!`, () => {
+        if (G.currentDanger) processNextReaction(); else startPreFlipPhase();
+      });
+    }
+  );
+}
+
+// Double Trouble — give any player an extra turn
+function playDoubleTrouble(player, card) {
+  const all = G.players.filter(p => !p.isEliminated);
+  discardFromHand(player, card);
+  pickPlayer(
+    'Double Trouble',
+    'Give an extra turn to which player?',
+    all,
+    (target) => {
+      G.addLog(`${player.name} played Double Trouble — ${target.name} gets an extra turn!`);
+      closeModal();
+      // End current turn flow, give target an extra turn
+      G.currentPlayerIdx = target.id;
+      G.dangerTargetIdx  = target.id;
+      G.currentDanger    = null;
+      hideDangerCard();
+      renderBoard();
+      showPassScreen();
+    }
+  );
+}
+
+// Cancel — negate the last-played action card
+function playCancel(player, card) {
+  discardFromHand(player, card);
+  G.addLog(`${player.name} played CANCEL!`);
+  showInfo('Cancel!', 'The last Action card played has been negated. Continue as normal.', () => {
+    if (G.currentDanger) processNextReaction(); else startPreFlipPhase();
+  });
+}
+
+// =============================================================
+//  CHARACTER ABILITIES
+// =============================================================
+
+function useCharacterAbility(player) {
+  if (!player.canUseAbility()) {
+    showInfo('No Uses Left', 'You have used all 3 ability charges.'); return;
+  }
+  executeAbility(player, () => startPreFlipPhase());
+}
+
+function useCharacterAbilityReaction(reactorIdx) {
+  const player = G.players[reactorIdx];
+  if (!player.canUseAbility()) return;
+  executeAbility(player, () => processNextReaction());
+}
+
+function executeAbility(player, doneCallback) {
+  const char = player.character;
+
+  switch (char.id) {
+    case 'c_carl': {
+      // Look at top 2 Danger cards and rearrange
+      player.useAbility();
+      G.addLog(`${player.name} (Curious Carl) peeks at top 2 Danger cards.`);
+      const top = G.dangerDeck.peekTop(2);
+      showModal('Curious Carl', `${player.name} sees the top 2 Danger cards. Drag to rearrange:`);
+      const row = document.getElementById('modal-card-row');
+      row.innerHTML = '';
+      top.forEach((c, i) => {
+        const img = document.createElement('img');
+        img.src   = c.image; img.alt = c.name; img.className = 'card-img clickable';
+        img.dataset.origIdx = i; img.title = c.name;
+        row.appendChild(img);
+      });
+      enableCardDrag(row);
+      document.getElementById('modal-buttons').innerHTML = '';
+      const btn = document.createElement('button');
+      btn.textContent = 'Confirm Order';
+      btn.className   = 'btn-primary';
+      btn.onclick     = () => {
+        const imgs     = row.querySelectorAll('img');
+        const newOrder = Array.from(imgs).map(img => parseInt(img.dataset.origIdx));
+        G.dangerDeck.rearrangeTop(newOrder);
+        closeModal();
+        doneCallback();
+      };
+      document.getElementById('modal-buttons').appendChild(btn);
+      break;
+    }
+    case 'c_rosie': {
+      // Roll die, avoid danger on 4+
+      if (!G.currentDanger) { showInfo('Reckless Rosie', 'No active Danger card to react to.'); return; }
+      player.useAbility();
+      const roll = Game.rollDie();
+      G.addLog(`${player.name} (Reckless Rosie) rolled a ${roll}.`);
+      showDieResult(roll, () => {
+        if (roll >= 4) {
+          showInfo('Reckless Rosie', `Rolled ${roll} — danger avoided!`, () => {
+            afterDangerResolved(G.dangerTarget);
+          });
+        } else {
+          showInfo('Reckless Rosie', `Rolled ${roll} — not high enough. Danger remains!`, doneCallback);
+        }
+      });
+      break;
+    }
+    case 'c_sammy': {
+      // Swap 1 hand card with top of action deck
+      player.useAbility();
+      pickCardFromHand(player, 'Silly Sammy', 'Choose a card from your hand to swap with the top of the Action deck:', () => {
+        // Immediately after the discard pick is done, give top action card
+        const drawn = G.actionDeck.draw();
+        if (drawn) {
+          player.hand.push(drawn);
+          G.addLog(`${player.name} (Silly Sammy) swapped a card with the Action deck.`);
+        }
+        renderBoard();
+        doneCallback();
+      }, true /* discard chosen card */);
+      break;
+    }
+    case 'c_nina': {
+      // See another player's hand
+      player.useAbility();
+      const others = G.players.filter(p => !p.isEliminated && p.id !== player.id);
+      pickPlayer('Naive Nina', 'Choose a player to reveal their hand:', others, (target) => {
+        const names = target.hand.map(c => c.name).join(', ') || '(empty)';
+        showInfo('Naive Nina', `${target.name}'s hand: ${names}`, doneCallback);
+      });
+      break;
+    }
+    case 'c_luke': {
+      // Passive (any_time) — handled in Take1 / SwapHands
+      showInfo('Lucky Luke', 'Lucky Luke triggers automatically when someone targets you with Take 1 or Swap Hands.', doneCallback);
+      break;
+    }
+    case 'c_bella': {
+      // Look at top 2 action cards
+      player.useAbility();
+      const top = G.actionDeck.peekTop(2);
+      showModal('Bold Bella', `${player.name} peeks at the top 2 Action cards:`);
+      const row = document.getElementById('modal-card-row');
+      row.innerHTML = '';
+      top.forEach(c => {
+        const img = document.createElement('img'); img.src = c.image; img.alt = c.name;
+        img.className = 'card-img'; img.title = c.name; row.appendChild(img);
+      });
+      document.getElementById('modal-buttons').innerHTML =
+        `<button class="btn-primary" onclick="closeModal();(${doneCallback.toString()})()">Done</button>`;
+      const doneBtn = document.createElement('button');
+      doneBtn.textContent = 'Done';
+      doneBtn.className   = 'btn-primary';
+      doneBtn.onclick     = () => { closeModal(); doneCallback(); };
+      document.getElementById('modal-buttons').innerHTML = '';
+      document.getElementById('modal-buttons').appendChild(doneBtn);
+      break;
+    }
+    case 'c_pete': {
+      // Swap 1 card with another player
+      player.useAbility();
+      const others = G.players.filter(p => !p.isEliminated && p.id !== player.id && p.hand.length > 0);
+      if (others.length === 0) { showInfo('Prankster Pete', 'No players have cards to swap with!'); return; }
+      pickPlayer('Prankster Pete', 'Swap 1 card with which player?', others, (target) => {
+        pickCardFromHand(player, 'Prankster Pete — Your Card', 'Choose a card to give away:', () => {
+          // Give random card from target
+          const stolen = target.stealRandomCard();
+          if (stolen) { player.hand.push(stolen); }
+          G.addLog(`${player.name} (Prankster Pete) swapped a card with ${target.name}.`);
+          renderBoard();
+          doneCallback();
+        }, true);
+      });
+      break;
+    }
+    case 'c_casey': {
+      // Passive — fires after resolving (handled in afterDangerResolved)
+      showInfo('Cautious Casey', 'Your ability activates automatically after a Danger card is resolved.', doneCallback);
+      break;
+    }
+    case 'c_lou': {
+      // Roll 4+ to redirect
+      if (!G.currentDanger) { showInfo('Grumpy Lou', 'No active Danger card.'); return; }
+      player.useAbility();
+      const roll = Game.rollDie();
+      G.addLog(`${player.name} (Grumpy Lou) rolled a ${roll}.`);
+      showDieResult(roll, () => {
+        if (roll >= 4) {
+          const others = G.players.filter(p => !p.isEliminated && p.id !== G.dangerTargetIdx);
+          pickPlayer('Grumpy Lou — Redirect', 'Roll succeeded! Send the Danger to:', others, (target) => {
+            G.dangerTargetIdx = target.id;
+            G.addLog(`${player.name} (Grumpy Lou) redirected danger to ${target.name}!`);
+            renderBoard();
+            showInfo('Redirected!', `Danger now targets ${target.name}!`, doneCallback);
+          });
+        } else {
+          showInfo('Grumpy Lou', `Rolled ${roll} — not enough! Danger stays.`, doneCallback);
+        }
+      });
+      break;
+    }
+    case 'c_mel': {
+      // Reroll any die — prompts to pick which die to reroll
+      player.useAbility();
+      G.addLog(`${player.name} (Melo Mel) uses reroll.`);
+      showInfo('Melo Mel', 'Melo Mel\'s reroll has been used. Apply it to the current dice roll.', doneCallback);
+      break;
+    }
+    default:
+      showInfo('Ability', char.abilityText, doneCallback);
+  }
+}
+
+// =============================================================
+//  DANGER RESOLUTION
+// =============================================================
+
+function resolveDanger() {
+  if (!G.currentDanger || G.dangerNegated) {
+    // Already negated by Not Today / Safety First
+    afterDangerResolved(G.dangerTarget);
+    return;
+  }
+
+  if (G.safetyFirstActive) {
+    G.addLog('Safety First is active — no life lost!');
+    afterDangerResolved(G.dangerTarget);
+    return;
+  }
+
+  const danger = G.currentDanger;
+  const target = G.dangerTarget;
+  renderBoard();
+
+  switch (danger.id) {
+    case 'd_escape':
+      G.addLog('Miraculous Escape — nothing happens!');
+      afterDangerResolved(target);
+      break;
+
+    case 'd_toaster':
+      resolveToaster(target);
+      break;
+
+    case 'd_shoelaces':
+      resolveShoelaces(target);
+      break;
+
+    case 'd_shark':
+      resolveShark(target);
+      break;
+
+    case 'd_tiles':
+      resolveTiles(target);
+      break;
+
+    case 'd_bear':
+      resolveBear(target);
+      break;
+
+    case 'd_leftovers':
+      resolveLeftovers(target);
+      break;
+
+    case 'd_texting':
+      resolveTexting(target);
+      break;
+
+    case 'd_sunglasses':
+      G.addLog(`${target.name} loses 1 life (Sunglasses at Night — unstoppable!)`);
+      target.loseLife();
+      afterDangerResolved(target);
+      break;
+
+    case 'd_parachute':
+      resolveParachute(target);
+      break;
+
+    default:
+      target.loseLife();
+      G.addLog(`${target.name} loses 1 life.`);
+      afterDangerResolved(target);
+  }
+}
+
+function resolveToaster(target) {
+  if (target.hand.length === 0) {
+    showInfo('Toaster Bath', `${target.name} has no cards — loses 1 life!`, () => {
+      target.loseLife(); G.addLog(`${target.name} lost 1 life.`); afterDangerResolved(target);
+    });
+    return;
+  }
+  showModal('Toaster Bath', `${target.name}: discard 1 Action card OR lose 1 life.`);
+  document.getElementById('modal-buttons').innerHTML = '';
+  const btn1 = makeBtn('Lose 1 Life', 'btn-danger', () => {
+    closeModal();
+    target.loseLife(); G.addLog(`${target.name} lost 1 life.`); afterDangerResolved(target);
+  });
+  document.getElementById('modal-buttons').appendChild(btn1);
+  const row = document.getElementById('modal-card-row');
+  row.innerHTML = '';
+  target.hand.forEach(c => {
+    const img = document.createElement('img');
+    img.src = c.image; img.alt = c.name; img.className = 'card-img clickable'; img.title = c.name;
+    img.onclick = () => {
+      target.removeFromHand(c.instanceId);
+      G.actionDeck.discard(c);
+      G.addLog(`${target.name} discarded ${c.name} (Toaster Bath).`);
+      closeModal(); afterDangerResolved(target);
+    };
+    row.appendChild(img);
+  });
+  document.getElementById('modal-body').textContent =
+    `Click a card below to discard it, or lose a life:`;
+}
+
+function resolveShoelaces(target) {
+  const others = G.players.filter(p => !p.isEliminated && p.id !== target.id && p.hand.length > 0);
+  if (others.length === 0) {
+    target.loseLife();
+    G.addLog(`No one could save ${target.name} — loses 1 life!`);
+    afterDangerResolved(target); return;
+  }
+
+  // Ask each other player if they want to save target
+  let saviorFound = false;
+  const queue     = [...others];
+
+  function askNext() {
+    if (queue.length === 0) {
+      if (!saviorFound) {
+        target.loseLife();
+        G.addLog(`Nobody saved ${target.name} — loses 1 life.`);
+      }
+      afterDangerResolved(target); return;
+    }
+    const savior = queue.shift();
+    showReactionPassScreen(savior, () => {
+      showModal('Forgot Shoelaces',
+        `${target.name} is in danger! ${savior.name}: discard 1 Action card to save them? Both draw 1 card if you do.`);
+      document.getElementById('modal-card-row').innerHTML = '';
+      const btns = document.getElementById('modal-buttons');
+      btns.innerHTML = '';
+      btns.appendChild(makeBtn('No — Pass', 'btn-neutral', () => { closeModal(); askNext(); }));
+      savior.hand.forEach(c => {
+        const img = document.createElement('img');
+        img.src = c.image; img.alt = c.name; img.className = 'card-img clickable'; img.title = c.name;
+        img.onclick = () => {
+          savior.removeFromHand(c.instanceId);
+          G.actionDeck.discard(c);
+          saviorFound = true;
+          const dTarget = G.actionDeck.draw();
+          const dSavior = G.actionDeck.draw();
+          if (dTarget) target.hand.push(dTarget);
+          if (dSavior) savior.hand.push(dSavior);
+          G.addLog(`${savior.name} saved ${target.name}! Both drew a card.`);
+          closeModal(); afterDangerResolved(target);
+        };
+        document.getElementById('modal-card-row').appendChild(img);
+      });
+    });
+  }
+  askNext();
+}
+
+function resolveShark(target) {
+  if (target.hand.length < 3) {
+    target.loseLife();
+    G.addLog(`${target.name} had only ${target.hand.length} card(s) — loses 1 life (Pet a Shark)!`);
+  } else {
+    G.addLog(`${target.name} had ${target.hand.length} cards — safe from the shark!`);
+  }
+  afterDangerResolved(target);
+}
+
+function resolveTiles(target) {
+  const roll = Game.rollDie();
+  G.addLog(`${target.name} rolled a ${roll} on Wet Tiles.`);
+  showDieResult(roll, () => {
+    if (roll >= 4) {
+      showInfo('Wet Tiles', `${target.name} rolled ${roll} — safe!`, () => afterDangerResolved(target));
+    } else {
+      target.loseLife();
+      showInfo('Wet Tiles', `${target.name} rolled ${roll} — loses 1 life!`, () => afterDangerResolved(target));
+    }
+  });
+}
+
+function resolveBear(target) {
+  const others = G.players.filter(p => !p.isEliminated && p.id !== target.id);
+  if (others.length === 0) {
+    target.loseLife();
+    G.addLog(`No one to redirect bear to — ${target.name} loses 1 life.`);
+    afterDangerResolved(target); return;
+  }
+  showModal('Tried to Hug a Bear',
+    `${target.name}: pass this Danger to another player, or lose 1 life.`);
+  document.getElementById('modal-card-row').innerHTML = '';
+  const btns = document.getElementById('modal-buttons');
+  btns.innerHTML = '';
+  btns.appendChild(makeBtn('Lose 1 Life', 'btn-danger', () => {
+    target.loseLife(); G.addLog(`${target.name} hugged the bear — loses 1 life.`);
+    closeModal(); afterDangerResolved(target);
+  }));
+  others.forEach(p => {
+    btns.appendChild(makeBtn(`Pass to ${p.name}`, 'btn-neutral', () => {
+      G.addLog(`${target.name} passed the bear to ${p.name}!`);
+      G.dangerTargetIdx = p.id;
+      closeModal();
+      // Resolve same danger on new target
+      G.currentDanger = G.currentDanger; // same card
+      resolveDanger();
+    }));
+  });
+}
+
+function resolveLeftovers(target) {
+  const canDiscard2 = target.hand.length >= 2;
+  showModal('Ate Mystery Leftovers',
+    `${target.name}: choose one — lose 1 life, lose 1 ability use, or discard 2 Action cards.`);
+  document.getElementById('modal-card-row').innerHTML = '';
+  const btns = document.getElementById('modal-buttons');
+  btns.innerHTML = '';
+  btns.appendChild(makeBtn('Lose 1 Life', 'btn-danger', () => {
+    target.loseLife(); G.addLog(`${target.name} chose to lose 1 life.`);
+    closeModal(); afterDangerResolved(target);
+  }));
+  if (target.abilitiesLeft > 0) {
+    btns.appendChild(makeBtn('Lose 1 Ability Use', 'btn-ability', () => {
+      target.useAbility(); G.addLog(`${target.name} lost 1 ability use.`);
+      closeModal(); afterDangerResolved(target);
+    }));
+  }
+  if (canDiscard2) {
+    btns.appendChild(makeBtn('Discard 2 Cards', 'btn-neutral', () => {
+      closeModal();
+      pickCardFromHand(target, 'Discard 1st Card', 'Choose first card to discard:', () => {
+        if (target.hand.length > 0) {
+          pickCardFromHand(target, 'Discard 2nd Card', 'Choose second card to discard:', () => {
+            G.addLog(`${target.name} discarded 2 cards (Mystery Leftovers).`);
+            afterDangerResolved(target);
+          }, true);
+        } else {
+          afterDangerResolved(target);
+        }
+      }, true);
+    }));
+  }
+}
+
+function resolveTexting(target) {
+  const leftIdx  = G.playerToLeft(target.id);
+  const leftPl   = G.players[leftIdx];
+  if (target.hand.length === 0) {
+    target.loseLife();
+    G.addLog(`${target.name} had no cards — loses 1 life (Texting).`);
+    afterDangerResolved(target); return;
+  }
+  showModal('Texted While Driving',
+    `${target.name}: give 1 Action card to ${leftPl.name} (left), or lose 1 life.`);
+  document.getElementById('modal-card-row').innerHTML = '';
+  const btns = document.getElementById('modal-buttons');
+  btns.innerHTML = '';
+  btns.appendChild(makeBtn('Lose 1 Life', 'btn-danger', () => {
+    target.loseLife(); G.addLog(`${target.name} loses 1 life (Texting).`);
+    closeModal(); afterDangerResolved(target);
+  }));
+  target.hand.forEach(c => {
+    const img = document.createElement('img');
+    img.src = c.image; img.alt = c.name; img.className = 'card-img clickable'; img.title = c.name;
+    img.onclick = () => {
+      target.removeFromHand(c.instanceId);
+      leftPl.hand.push(c);
+      G.addLog(`${target.name} gave ${c.name} to ${leftPl.name}.`);
+      closeModal(); afterDangerResolved(target);
+    };
+    document.getElementById('modal-card-row').appendChild(img);
+  });
+}
+
+function resolveParachute(target) {
+  const alive = G.activePlayers;
+  if (target.hand.length === 0) {
+    target.loseLife();
+    G.addLog(`${target.name} had no cards — loses 1 life (Parachute).`);
+    afterDangerResolved(target); return;
+  }
+  showModal('Forgot Parachute', `${target.name}: give 1 Action card to any player, or lose 1 life.`);
+  document.getElementById('modal-card-row').innerHTML = '';
+  const btns = document.getElementById('modal-buttons');
+  btns.innerHTML = '';
+  btns.appendChild(makeBtn('Lose 1 Life', 'btn-danger', () => {
+    target.loseLife(); G.addLog(`${target.name} loses 1 life (Parachute).`);
+    closeModal(); afterDangerResolved(target);
+  }));
+
+  // First pick a card, then pick a player
+  target.hand.forEach(c => {
+    const img = document.createElement('img');
+    img.src = c.image; img.alt = c.name; img.className = 'card-img clickable'; img.title = c.name;
+    img.onclick = () => {
+      closeModal();
+      const others = alive.filter(p => p.id !== target.id);
+      pickPlayer('Parachute — Give To', 'Give this card to which player?', others.length ? others : alive, (recipient) => {
+        target.removeFromHand(c.instanceId);
+        recipient.hand.push(c);
+        G.addLog(`${target.name} gave ${c.name} to ${recipient.name}.`);
+        renderBoard();
+        afterDangerResolved(target);
+      });
+    };
+    document.getElementById('modal-card-row').appendChild(img);
+  });
+}
+
+// =============================================================
+//  POST-RESOLUTION
+// =============================================================
+
+function afterDangerResolved(player) {
+  // Discard the danger card
+  if (G.currentDanger) {
+    G.dangerDeck.discard(G.currentDanger);
+    G.currentDanger = null;
+  }
+
+  renderBoard();
+  hideDangerCard();
+
+  // Check Cautious Casey passive
+  if (player && player.character.id === 'c_casey' && player.canUseAbility()) {
+    player.useAbility();
+    const drawn = G.actionDeck.draw();
+    if (drawn) {
+      player.hand.push(drawn);
+      G.addLog(`${player.name} (Cautious Casey) drew 1 card after resolving danger.`);
+    }
+  }
+
+  renderBoard();
+
+  // Check for eliminations
+  const justEliminated = G.players.filter(p => p.isEliminated && p.lives === 0);
+  justEliminated.forEach(p => G.addLog(`💀 ${p.name} has been eliminated!`));
+  renderLog();
+
+  if (G.checkWinner()) {
+    showWinnerScreen();
+    return;
+  }
+
+  endTurnCleanup();
+}
+
+function endTurnCleanup() {
+  G.advanceTurn();
+  renderBoard();
+  renderLog();
+
+  if (G.checkWinner()) { showWinnerScreen(); return; }
+
+  showPassScreen();
+}
+
+// =============================================================
+//  WINNER
+// =============================================================
+
+function showWinnerScreen() {
+  const w = G.winner;
+  if (!w) return;
+  document.getElementById('winner-title').textContent   = `🏆 ${w.name} Wins!`;
+  document.getElementById('winner-char-img').src        = w.character.image;
+  document.getElementById('winner-msg').textContent     = `Last laugh goes to ${w.name} playing as ${w.character.name}!`;
+  document.getElementById('winner-screen').classList.add('open');
+  renderLog();
+}
+
+// =============================================================
+//  MODAL HELPERS
+// =============================================================
+
+function showModal(title, body, confirmCallback = null) {
+  document.getElementById('modal-title').textContent = title;
+  document.getElementById('modal-body').textContent  = body;
+  document.getElementById('modal-card-row').innerHTML = '';
+  document.getElementById('modal-buttons').innerHTML  = '';
+  if (confirmCallback) {
+    const btn = makeBtn('Confirm', 'btn-primary', confirmCallback);
+    document.getElementById('modal-buttons').appendChild(btn);
+  }
+  document.getElementById('modal-overlay').classList.add('open');
+}
+
+function showInfo(title, msg, callback = null) {
+  showModal(title, msg);
+  const btn = makeBtn('OK', 'btn-primary', () => { closeModal(); if (callback) callback(); });
+  document.getElementById('modal-buttons').appendChild(btn);
+}
+
+function showConfirm(title, msg, yesCallback, noCallback) {
+  showModal(title, msg);
+  const btns = document.getElementById('modal-buttons');
+  btns.appendChild(makeBtn('Yes', 'btn-safe',    () => { closeModal(); yesCallback(); }));
+  btns.appendChild(makeBtn('No',  'btn-neutral', () => { closeModal(); noCallback(); }));
+}
+
+function closeModal() {
+  document.getElementById('modal-overlay').classList.remove('open');
+}
+
+function pickPlayer(title, body, players, callback) {
+  showModal(title, body);
+  const btns = document.getElementById('modal-buttons');
+  players.forEach(p => {
+    btns.appendChild(makeBtn(
+      `${p.name} (${heartsStr(p.lives, p.maxLives)})`,
+      'btn-neutral',
+      () => { closeModal(); callback(p); }
+    ));
+  });
+}
+
+function pickCardFromHand(player, title, body, callback, discardIt = false) {
+  showModal(title, body);
+  const row = document.getElementById('modal-card-row');
+  row.innerHTML = '';
+  player.hand.forEach(c => {
+    const img = document.createElement('img');
+    img.src = c.image; img.alt = c.name; img.className = 'card-img clickable'; img.title = c.name;
+    img.onclick = () => {
+      if (discardIt) {
+        player.removeFromHand(c.instanceId);
+        G.actionDeck.discard(c);
+        G.addLog(`${player.name} discarded ${c.name}.`);
+        updateDeckCounts();
+      }
+      closeModal();
+      callback(c);
+    };
+    row.appendChild(img);
+  });
+}
+
+function showDieResult(roll, callback) {
+  const faces = ['', '⚀', '⚁', '⚂', '⚃', '⚄', '⚅'];
+  showModal('Dice Roll', '');
+  document.getElementById('modal-body').innerHTML =
+    `<div class="die-display">${faces[roll]}</div><p>Rolled a <strong>${roll}</strong></p>`;
+  const btn = makeBtn('OK', 'btn-primary', () => { closeModal(); callback(); });
+  document.getElementById('modal-buttons').appendChild(btn);
+}
+
+function makeBtn(label, cls, fn) {
+  const b = document.createElement('button');
+  b.textContent = label;
+  b.className   = cls;
+  b.onclick     = fn;
+  return b;
+}
+
+// =============================================================
+//  INIT — kick off setup screen
+// =============================================================
+showScreen('setup-screen');
+</script>
+</body>
+</html>
