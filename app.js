@@ -457,7 +457,7 @@ function popOverlay(kind, title, sub, ms = 1900) {
   return new Promise(resolve => {
     const s = $('pop-screen');
     s.className = `overlay pop-${kind}`;
-    $('pop-emoji').textContent = kind === 'nope' ? '🙅' : '💖';
+    $('pop-emoji').textContent = kind === 'wow' ? '💖' : title.startsWith('NOT TODAY') ? '✋' : '🙅';
     $('pop-title').textContent = title;
     $('pop-sub').textContent   = sub;
     restartAnimations(s);
@@ -1385,9 +1385,9 @@ const EFFECTS = {
   // ── Cards that only make sense while facing a Whoopsies ──
   async a_not_today(p) {
     G.addLog(`🛑 NOT TODAY! ${p.name} shrugs off "${G.currentWhoopsies.name}".`);
-    SFX.good();
     botSay(p, 'dodge');
-    await info('Not Today!', `${p.name} stops the Whoopsies cold.`);
+    renderAll();
+    await popOverlay('nope', 'NOT TODAY!', `${p.name} stops "${G.currentWhoopsies.name}" cold!`);
     return 'negated';
   },
 
