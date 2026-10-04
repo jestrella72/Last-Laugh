@@ -776,3 +776,10 @@ input, select { font-size: 16px !important; }   /* stops iPhone zooming into inp
 #my-table .card { --w: 64px; }
 .my-table-label { font-weight: 800; color: var(--red); flex: 1 1 100%; font-size: .85rem; }
 .hand-note { flex: none; align-self: center; font-weight: 800; font-size: .78rem; color: var(--ink-soft); writing-mode: vertical-rl; transform: rotate(180deg); }
+
+/* Current player's table, shown big before the Whoopsies deck */
+.turn-table { background: #fff3f3; border: 3px dashed var(--red); border-radius: 16px; padding: 8px 10px; }
+.turn-table .pile-label { color: var(--red); }
+.turn-table-cards { display: flex; gap: 8px; }
+.turn-table-cards .card { --w: 92px; }
+@media (max-width: 560px) { .turn-table-cards .card { --w: 70px; } }

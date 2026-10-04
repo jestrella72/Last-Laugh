@@ -62,7 +62,11 @@ Good to know:
 
 **You only face Whoopsies on your own turn.** Everyone has a **table**. A Whoopsies sent to you (Redirect, Slip Away, the bear, Out of Luck!!, Fester) lands face-up on your table and waits there. On your turn you face the ones on your table first (you can play cards before each), then flip your own. A table holds **at most 2**, so the most you face in a turn is 2 + your own flip. Only the player whose turn it is flips; Grumpy Lou's swap only works on Lou's own turn.
 
-**Tried to hug a bear** can be passed on once, when it's flipped. Whoever gets handed the bear faces it on their turn and can't pass it again.
+**Tried to hug a bear:** pass it to another player's table, or keep it and lose 1 life. Whoever gets it deals with it on their turn the same way.
+
+**About to lose a life?** You're offered **Not Today!** (if a Whoopsies is hitting you) and **Second Chance** to keep it.
+
+**End of turn:** you draw 1 Action card and the game shows you which one (only you see it).
 
 **Out of Luck!!** on a 5–6 goes to the table of the player on your left or right, and they roll for it on their turn.
 

@@ -294,7 +294,7 @@ const NET = {
       const orig = SFX[name].bind(SFX);
       SFX[name] = (...a) => {
         orig(...a);
-        if (this.isHost && this.started && !SFX.quiet) this.broadcast({ t: 'sfx', name });
+        if (this.isHost && this.started && !SFX.quiet && !SFX.localOnly) this.broadcast({ t: 'sfx', name });
       };
     }
   },
@@ -516,8 +516,8 @@ const NET = {
       case 'reveal':
         quietly(() => revealWhoopsies(msg.card, { name: msg.name, isBot: true }));
         break;
-      case 'redirect':
-        quietly(() => redirectAlert({ name: msg.name, isBot: true }, msg.why, msg.card));
+      case 'redirect':   // only sent to the player who receives the card
+        redirectAlert({ name: msg.name, isBot: false }, msg.why, msg.card);
         break;
       case 'hurt':
         hurtOverlay(msg.title, msg.sub, 2600);

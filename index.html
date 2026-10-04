@@ -19,7 +19,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Luckiest+Guy&family=Nunito:wght@600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="styles.css?v=8">
 </head>
 <body>
 
@@ -121,6 +121,11 @@
     <div id="players-bar"></div>
 
     <section id="table">
+      <div class="pile turn-table" id="turn-table" style="display:none">
+        <div class="pile-label" id="turn-table-label"></div>
+        <div class="turn-table-cards" id="turn-table-cards"></div>
+        <div class="pile-count">face these first ①②, then flip</div>
+      </div>
       <div class="pile">
         <div class="pile-label">Whoopsies</div>
         <div class="card"><img src="images/cards/back-whoopsies.webp" alt="Whoopsies deck"></div>
@@ -234,11 +239,11 @@
 </div>
 
 <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
-<script src="cards.js"></script>
-<script src="game.js"></script>
-<script src="sound.js"></script>
-<script src="bots.js"></script>
-<script src="net.js"></script>
-<script src="app.js"></script>
+<script src="cards.js?v=8"></script>
+<script src="game.js?v=8"></script>
+<script src="sound.js?v=8"></script>
+<script src="bots.js?v=8"></script>
+<script src="net.js?v=8"></script>
+<script src="app.js?v=8"></script>
 </body>
 </html>

@@ -353,9 +353,24 @@ function revealWhoopsies(card, target) {
 
 // The shocked-emoji alert + FAHHH, shown whenever a Whoopsies
 // gets pushed onto someone else.
+// Only the player it's sent to gets the big alert + FAHHH;
+// everyone else just gets a small note.
 function redirectAlert(toPlayer, why, card = G.currentWhoopsies) {
-  if (NET.isHost) NET.broadcast({ t: 'redirect', name: toPlayer.name, why, card: packCard(card) });
+  let showHere = !toPlayer.isBot;   // local play: shared screen, skip it for bots
+  if (NET.isHost) {
+    if (toPlayer.id !== NET.localIdx && !toPlayer.isBot) {
+      NET.sendTo(toPlayer.id, { t: 'redirect', name: toPlayer.name, why, card: packCard(card) });
+    }
+    showHere = toPlayer.id === NET.localIdx;
+  }
+  if (NET.isClient) showHere = true;   // the host only sends it to the target
+  if (!showHere) {
+    toast(`👉 "${card.name}" goes on ${toPlayer.name}'s table`, card);
+    return sleep(600);
+  }
+  SFX.localOnly = true;
   SFX.fahhh();
+  SFX.localOnly = false;
   return new Promise(resolve => {
     $('redirect-name').textContent = `${toPlayer.name}!`;
     $('redirect-card-img').src     = card.image;
@@ -393,6 +408,21 @@ async function hurt(player, opts = {}) {
       const use = player.isBot || await yesNo('Not Today!?', `${player.name}, play Not Today! to stop losing this life?`,
                                               'Not today! 🛑', 'Take the hit', { kicker: 'Last chance', cards: [{ card: nt }], who: player });
       if (use && (await playAction(player, nt)) === 'negated') return false;
+    }
+  }
+  // Second Chance: play it right as you're about to lose a life to keep it
+  if (!G.safetyActive && !player.isEliminated) {
+    const sc = player.hand.find(c => c.id === 'a_second_chance');
+    const frozen = player.id === G.currentPlayerIdx && player.frozenThisTurn && G.actionsThisTurn >= 1;
+    if (sc && !frozen) {
+      const use = player.isBot || await yesNo('Second Chance?', `${player.name}, play Second Chance to keep this life?`,
+                                              'Keep my life 💖', 'Take the hit', { kicker: 'Last chance', cards: [{ card: sc }], who: player });
+      if (use) {
+        G.savingLife = true;
+        const r = await playAction(player, sc);
+        G.savingLife = false;
+        if (r === 'saved') return false;
+      }
     }
   }
   const lost = G.damage(player, opts);
@@ -722,6 +752,23 @@ function renderPlayers() {
 }
 
 function renderTable() {
+  // The current player's table: faced first, before flipping from the deck
+  const cur = G.currentPlayer, tt = $('turn-table');
+  if (cur.table?.length) {
+    tt.style.display = '';
+    $('turn-table-label').textContent = `📥 ${cur.name}'s table`;
+    const box = $('turn-table-cards');
+    box.innerHTML = '';
+    cur.table.forEach((e, i) => {
+      const el = cardEl(e.card, { cls: 'pickable', badge: String(i + 1) });
+      el.title = `${e.card.name} — ${e.why}`;
+      el.onclick = () => ask({ local: true, kicker: `On ${cur.name}'s table`, title: e.card.name, single: true,
+        cards: [{ card: e.card }], body: `${e.why}. ${cur.name} faces it this turn${i ? ', after the one before it' : ''}.`,
+        buttons: [{ label: 'Close', cls: 'btn-yellow', value: 0 }] });
+      box.appendChild(el);
+    });
+  } else tt.style.display = 'none';
+
   $('whoopsies-count').textContent = `${G.whoopsiesDeck.size} left`;
   $('action-count').textContent    = `${G.actionDeck.size} left`;
 
@@ -1059,7 +1106,7 @@ function onEndTurn() {
 }
 
 // Ending a turn always draws 1 Action card, then play moves on.
-function endTurn() {
+async function endTurn() {
   if (G.winner) return 'ended';
   const p = G.currentPlayer;
   if (!p.isEliminated) {
@@ -1068,6 +1115,11 @@ function endTurn() {
       p.hand.push(c);
       G.addLog(`${p.name} draws 1 Action card and ends their turn.`);
       SFX.flip();
+      // Only the player who drew it sees which card it is
+      if (!p.isBot) {
+        renderAll();
+        await info('You drew…', `${c.name} goes into your hand.`, { kicker: 'End of turn', cards: [{ card: c }], who: p, auto: 2600 });
+      }
     }
   }
   const before = G.extraTurns.length;
@@ -1255,6 +1307,13 @@ const EFFECTS = {
   },
 
   async a_second_chance(p) {
+    if (G.savingLife) {   // played right before losing a life: keep it
+      G.savingLife = false;
+      G.addLog(`💖 Second Chance! ${p.name} keeps their life.`);
+      SFX.good();
+      toast(`💖 ${p.name} keeps their life!`);
+      return 'saved';
+    }
     p.gainLife();
     G.addLog(`💖 ${p.name} gains 1 life (${p.lives}).`);
     SFX.good();
@@ -1433,7 +1492,6 @@ async function faceWhoopsies(card, targetIdx, { revealed = false, passedBear = f
   G.currentWhoopsies   = card;
   G.whoopsiesTargetIdx = targetIdx;
   G.sentAway           = false;        // set when it's sent to someone's table
-  G.currentPassedBear  = passedBear;   // a bear someone handed you can't be passed again
   G.addLog(`⚠️ Whoopsies! ${G.whoopsiesTarget.name} faces "${card.name}".`, 'whoops');
   renderAll();
   if (!revealed) await revealWhoopsies(card, G.whoopsiesTarget);
@@ -1445,7 +1503,6 @@ async function faceWhoopsies(card, targetIdx, { revealed = false, passedBear = f
   const sent = G.sentAway;
   if (!sent) G.whoopsiesDeck.discard(G.currentWhoopsies);   // sent cards stay on a table
   G.currentWhoopsies = null;
-  G.currentPassedBear = false;
   renderAll();
   if (!sent) await caseyCheck(resolver);
 }
@@ -1714,21 +1771,16 @@ const RESOLVERS = {
     await info('Saved!', `${s.name} grabbed ${t.name} just in time. You both draw a card.`);
   },
 
-  // "When this card enters play" you may pass it on — once.
-  // Whoever is handed the bear gets it on their table and takes the hug.
+  // Pass the bear to another player's table (they deal with it on their
+  // turn, and may pass it on again), or keep it and lose 1 life.
   async w_bear(t) {
-    if (G.currentPassedBear) {
-      await info('Tried to hug a bear 🐻', `Someone handed ${t.name} this bear. It can't be passed again!`);
-      await hurt(t);
-      return;
-    }
     const others = G.activePlayers.filter(o => o.id !== t.id && G.canReceive(o));
     if (!others.length) {
       await info('Tried to hug a bear 🐻', `Everyone else's table is full. ${t.name} keeps the bear.`);
       await hurt(t);
       return;
     }
-    const v = t.isBot ? Bot.pickPlayer(t, others).id : await ask({ who: t,
+    const v = t.isBot ? (Math.random() < .75 ? Bot.pickPlayer(t, others).id : 'keep') : await ask({ who: t,
       kicker: '🐻 Tried to hug a bear', title: `${t.name}, pass the bear?`,
       body: 'Choose another player to take this Whoopsies card, or keep it and lose 1 life.',
       players: others,
@@ -1737,7 +1789,7 @@ const RESOLVERS = {
     });
     if (v === 'keep' || v === undefined) { await hurt(t); return; }
     botSay(t, 'redirect');
-    await redirectTo(v, `${t.name} handed you the bear hug`, { passedBear: true });
+    await redirectTo(v, `${t.name} handed you the bear hug`);
   },
 
   async w_leftovers(t) {
@@ -1865,6 +1917,7 @@ function showRules() {
         <li><b>Cancel</b> can stop any Action card, and Cancels stack: Cancel the Cancel, and so on. The game asks automatically.</li>
         <li><b>Redirects stack:</b> whoever a Whoopsies gets redirected to can Redirect it again.</li>
         <li><b>Only the player whose turn it is flips a Whoopsies.</b> Everyone else waits for their turn.</li>
+        <li><b>About to lose a life?</b> You'll be offered Not Today! (if a Whoopsies is hitting you) and Second Chance to keep it.</li>
         <li><b>Everyone has a table.</b> A Whoopsies sent to you (Redirect, Slip Away, the bear, Out of Luck!!, Fester) lands face-up on your table and waits for <b>your turn</b>. On your turn you face those first, then flip your own. A table holds at most 2.</li>
         <li><b>Not Today!</b> can be played at any time, even right before a Whoopsies takes your life.</li>
         <li><b>Drove wearing sunglasses at night</b> can only be stopped by Slip Away or Redirect.</li>
