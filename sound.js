@@ -41,6 +41,14 @@ class SoundManager {
     this.musicOn = this.#load('ll-music', true);
     this.sfxOn   = this.#load('ll-sfx', true);
     this.#fahhh.preload = 'auto';
+
+    // Phones: pause audio while the game is in the background and wake
+    // it up again when you come back (iOS can leave it stuck silent).
+    document.addEventListener('visibilitychange', () => {
+      if (!this.#ctx) return;
+      if (document.hidden) this.#ctx.suspend().catch(() => {});
+      else this.#ctx.resume().catch(() => {});
+    });
   }
 
   #load(key, fallback) {
@@ -52,7 +60,13 @@ class SoundManager {
   // Browsers only allow audio after the user clicks something,
   // so this is called from the first click.
   unlock() {
-    if (this.#ctx) { if (this.#ctx.state === 'suspended') this.#ctx.resume(); return; }
+    // iPhone: play like a media app so the silent switch doesn't mute
+    // the game (Safari 16.4+; older phones just ignore this)
+    try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch {}
+    if (this.#ctx) {
+      if (this.#ctx.state !== 'running' && !document.hidden) this.#ctx.resume().catch(() => {});
+      return;
+    }
     const AC = window.AudioContext || window.webkitAudioContext;
     if (!AC) return;
     this.#ctx    = new AC();
@@ -73,6 +87,10 @@ class SoundManager {
   }
 
   #fahhhBuf = null;
+
+  // Handy for checking audio on a phone: SFX.audioState in the console
+  get audioState() { return this.#ctx?.state ?? 'locked (tap the screen)'; }
+  get fahhhReady() { return !!this.#fahhhBuf; }
 
   // ── Music ───────────────────────────────────────────────
   startMusic() {
