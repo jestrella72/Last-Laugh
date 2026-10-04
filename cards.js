@@ -14,14 +14,30 @@
  * └─────────────────────────────────────────────────────────┘
  */
 
+const IMG = 'images/cards/';
+
+// Every card says WHEN it can be played. These match the coloured
+// tags printed on the cards.
+const TIMING = {
+  YOUR_TURN: 'your_turn',   // black tag  — "During Your Turn"
+  ANY_TIME:  'any_time',    // blue tag   — "Play At Any Time"
+  REACTION:  'reaction',    // red tag    — "Reaction"
+};
+
+const TIMING_LABEL = {
+  your_turn: 'During Your Turn',
+  any_time:  'Play At Any Time',
+  reaction:  'Reaction',
+};
+
 class Card {
   // The constructor runs ONCE when you do: new Card(...)
   // "this" refers to the specific object being created.
   constructor(id, name, type, image, copies) {
-    this.id      = id;       // unique key,  e.g. 'd_toaster'
+    this.id      = id;       // unique key,  e.g. 'w_toaster'
     this.name    = name;     // display name
-    this.type    = type;     // 'danger' | 'action' | 'character'
-    this.image   = image;    // filename, e.g. '4.png'
+    this.type    = type;     // 'whoopsies' | 'action' | 'character'
+    this.image   = image;    // file path,   e.g. 'images/cards/w-toaster.webp'
     this.copies  = copies;   // how many go into the deck
   }
 
@@ -34,8 +50,8 @@ class Card {
 /*
  * ┌─────────────────────────────────────────────────────────┐
  *  OOP CONCEPT #2 — INHERITANCE  (extends / super)
- *  DangerCard IS A Card.  It gets everything Card has,
- *  then adds its own danger-specific stuff.
+ *  WhoopsiesCard IS A Card.  It gets everything Card has,
+ *  then adds its own Whoopsies-specific stuff.
  *  super() calls the parent's constructor first — required.
  * └─────────────────────────────────────────────────────────┘
  *
@@ -47,21 +63,21 @@ class Card {
  * └─────────────────────────────────────────────────────────┘
  */
 
-class DangerCard extends Card {
+class WhoopsiesCard extends Card {
   // unstoppable = true means only Slip Away / Redirect can help
   constructor(id, name, image, copies, effectText, unstoppable = false) {
-    super(id, name, 'danger', image, copies); // call parent first
+    super(id, name, 'whoopsies', image, copies); // call parent first
     this.effectText  = effectText;
     this.unstoppable = unstoppable;
   }
 
-  describe() { return `⚠️  DANGER: ${this.name}`; }
+  describe() { return `⚠️ WHOOPSIES: ${this.name}`; }
 }
 
 class ActionCard extends Card {
   constructor(id, name, image, copies, timing, effectText) {
     super(id, name, 'action', image, copies);
-    this.timing     = timing;      // 'your_turn'  |  'any_time'
+    this.timing     = timing;      // one of TIMING
     this.effectText = effectText;
   }
 
@@ -70,23 +86,24 @@ class ActionCard extends Card {
    * A getter looks like a property but runs code when read.
    * card.canPlayAnytime  (no parentheses!)
    */
-  get canPlayAnytime() { return this.timing === 'any_time'; }
+  get canPlayAnytime() { return this.timing !== TIMING.YOUR_TURN; }
+  get timingLabel()    { return TIMING_LABEL[this.timing]; }
 
-  describe() {
-    const tag = this.canPlayAnytime ? '⚡ Any Time' : '🎯 Your Turn';
-    return `🃏 ${this.name}  —  ${tag}`;
-  }
+  describe() { return `🃏 ${this.name} — ${this.timingLabel}`; }
 }
 
 class CharacterCard extends Card {
-  constructor(id, name, image, maxLives, abilityText, abilityTiming) {
+  // uses = how many ace icons are printed on the card
+  constructor(id, name, image, uses, timing, abilityText) {
     super(id, name, 'character', image, 1);
-    this.maxLives      = maxLives;
-    this.abilityText   = abilityText;
-    this.abilityTiming = abilityTiming; // 'active' | 'any_time' | 'passive'
+    this.uses        = uses;
+    this.timing      = timing;
+    this.abilityText = abilityText;
   }
 
-  describe() { return `👤 ${this.name}: ${this.abilityText}`; }
+  get timingLabel() { return TIMING_LABEL[this.timing]; }
+
+  describe() { return `👤 ${this.name} (${this.uses} uses): ${this.abilityText}`; }
 }
 
 // =============================================================
@@ -94,141 +111,119 @@ class CharacterCard extends Card {
 //  Now we CREATE actual cards using the blueprints.
 // =============================================================
 
-const DANGER_CARDS = [
-  new DangerCard('d_toaster',
-    'Took a Bath with a Toaster', '4.png', 5,
-    'Discard 1 Action card or lose 1 life.'),
+const WHOOPSIES_CARDS = [
+  new WhoopsiesCard('w_shoelaces', 'Forgot to tie shoelaces near a cliff', IMG + 'w-shoelaces.webp', 5,
+    'Lose 1 life unless another player discards an Action card to save you. If they do, both of you draw 1 card.'),
 
-  new DangerCard('d_shoelaces',
-    'Forgot to Tie Shoelaces Near a Cliff', '2.png', 5,
-    'Lose 1 life unless another player discards an Action card to save you. If they do, both players draw 1 card.'),
+  new WhoopsiesCard('w_shark', 'Tried to pet a shark', IMG + 'w-shark.webp', 5,
+    'If you have fewer than 3 Action cards in your hand, lose 1 life. Otherwise, do nothing.'),
 
-  new DangerCard('d_shark',
-    'Pet a Shark', '3.png', 5,
-    'If you have fewer than 3 Action cards in hand, lose 1 life. Otherwise nothing happens.'),
+  new WhoopsiesCard('w_toaster', 'Took a bath with a toaster', IMG + 'w-toaster.webp', 5,
+    'You must discard an Action card or lose 1 life.'),
 
-  new DangerCard('d_tiles',
-    'Danced on Wet Tiles', '6.png', 5,
-    'Roll a die. 4, 5, or 6 = safe. Otherwise lose 1 life.'),
+  new WhoopsiesCard('w_bear', 'Tried to hug a bear', IMG + 'w-bear.webp', 5,
+    'You may choose another player to take this Whoopsies card. If you don\'t, lose 1 life.'),
 
-  new DangerCard('d_bear',
-    'Tried to Hug a Bear', '5.png', 5,
-    'Choose another player to take this Danger card instead, or lose 1 life.'),
+  new WhoopsiesCard('w_tiles', 'Danced on wet tiles', IMG + 'w-tiles.webp', 5,
+    'Roll a die. If you roll a 4, 5, or 6, you\'re safe. Otherwise, lose 1 life.'),
 
-  new DangerCard('d_escape',
-    'Miraculous Escape', '10.png', 2,
-    'Nothing happens! You live to see another round.'),
-
-  new DangerCard('d_leftovers',
-    'Ate Mystery Leftovers', '7.png', 2,
+  new WhoopsiesCard('w_leftovers', 'Ate mystery leftovers', IMG + 'w-leftovers.webp', 2,
     'Choose one: lose 1 life, lose 1 ability use, or discard 2 Action cards from your hand.'),
 
-  new DangerCard('d_texting',
-    'Texted While Driving', '8.png', 2,
-    'Give 1 Action card from your hand to the player on your left, or lose 1 life.'),
+  new WhoopsiesCard('w_texting', 'Texting while driving', IMG + 'w-texting.webp', 2,
+    'Give 1 Action card from your hand to the player on your left or lose 1 life.'),
 
-  new DangerCard('d_sunglasses',
-    'Wore Sunglasses at Night', '9.png', 3,
-    'Lose 1 life. Only Slip Away or Redirect can stop this effect.',
+  new WhoopsiesCard('w_sunglasses', 'Drove wearing sunglasses at night', IMG + 'w-sunglasses.webp', 3,
+    'Lose 1 life. This effect can\'t be stopped by any Action card except Slip Away or Redirect.',
     true), // unstoppable flag
 
-  new DangerCard('d_parachute',
-    'Forgot Parachute While Skydiving', '1.png', 2,
-    'Give 1 Action card from your hand to any player of your choice, or lose 1 life.'),
+  new WhoopsiesCard('w_outofluck', 'Out of Luck!!', IMG + 'w-outofluck.webp', 3,
+    'Roll now! 1–2: lose 1 life. 3–4: nothing happens. 5–6: pass this card to the player on your right or left — they must roll for it immediately.'),
+
+  new WhoopsiesCard('w_escape', 'Miraculous Escape!', IMG + 'w-escape.webp', 2,
+    'Nothing happens! You live to see another round.'),
 ];
 
 const ACTION_CARDS = [
-  new ActionCard('a_not_today',
-    'Not Today!', '11.png', 5, 'any_time',
-    'Prevent a Danger card from affecting you. (Play after the card is revealed, before resolving.)'),
+  new ActionCard('a_not_today', 'Not Today!', IMG + 'a-not-today.webp', 5, TIMING.REACTION,
+    'Play after a Whoopsies card is revealed to prevent it from affecting you.'),
 
-  new ActionCard('a_redirect',
-    'Redirect', '13.png', 4, 'any_time',
-    'Force another player to face your Danger card instead. (You choose who.)'),
+  new ActionCard('a_slip', 'Slip Away', IMG + 'a-slip-away.webp', 4, TIMING.ANY_TIME,
+    'Pass the Whoopsies card to the player on your left. They must resolve it instead.'),
 
-  new ActionCard('a_second_chance',
-    'Second Chance', '14.png', 4, 'any_time',
-    'Survive a Danger card without losing a life. Can even be played after taking the hit.'),
+  new ActionCard('a_redirect', 'Redirect', IMG + 'a-redirect.webp', 4, TIMING.ANY_TIME,
+    'Choose another player to face your Whoopsies card instead of you.'),
 
-  new ActionCard('a_peek',
-    'Peek Ahead', '16.png', 4, 'your_turn',
-    'Look at the top 3 Danger cards and rearrange them in any order.'),
+  new ActionCard('a_second_chance', 'Second Chance', IMG + 'a-second-chance.webp', 4, TIMING.ANY_TIME,
+    'Gain 1 life. Play at any time, up to your life cap.'),
 
-  new ActionCard('a_cancel',
-    'Cancel', '15.png', 4, 'any_time',
-    'Negate any Action card played by any player.'),
+  new ActionCard('a_cancel', 'Cancel', IMG + 'a-cancel.webp', 4, TIMING.ANY_TIME,
+    'Negate any Action card being played by any player.'),
 
-  new ActionCard('a_slip',
-    'Slip Away', '12.png', 4, 'your_turn',
-    'Pass the Danger card to the player on your left — they must resolve it instead.'),
+  new ActionCard('a_peek', 'Peek Ahead', IMG + 'a-peek.webp', 4, TIMING.YOUR_TURN,
+    'Look at the top 3 Whoopsies cards. Rearrange them in any order and place them back.'),
 
-  new ActionCard('a_safety',
-    'Safety First', '17.png', 2, 'your_turn',
-    'Prevent ALL players from losing a life this round.'),
+  new ActionCard('a_safety', 'Safety First', IMG + 'a-safety.webp', 2, TIMING.YOUR_TURN,
+    'Prevent all players from losing life this round.'),
 
-  new ActionCard('a_swap',
-    'Swap Hands', '19.png', 2, 'your_turn',
-    'Swap your entire hand of Action cards with another player.'),
+  new ActionCard('a_take1', 'Take 1', IMG + 'a-take1.webp', 5, TIMING.YOUR_TURN,
+    'Pick a player and take 1 random Action card from their hand.'),
 
-  new ActionCard('a_draw2',
-    'Draw 2', '21.png', 4, 'your_turn',
-    'Draw 2 Action cards from the Action deck.'),
+  new ActionCard('a_swap', 'Swap Hands', IMG + 'a-swap.webp', 2, TIMING.YOUR_TURN,
+    'You may swap your entire hand of Action cards with another player.'),
 
-  new ActionCard('a_skip',
-    'Skip Your Turn', '20.png', 2, 'any_time',
-    'Skip any player\'s turn — including your own. Play at any time.'),
+  new ActionCard('a_skip', 'Skip Your Turn', IMG + 'a-skip.webp', 2, TIMING.YOUR_TURN,
+    'Skip any player\'s turn, including your own.'),
 
-  new ActionCard('a_take1',
-    'Take 1', '18.png', 5, 'your_turn',
-    'Choose a player and steal 1 random Action card from their hand.'),
+  new ActionCard('a_draw2', 'Draw 2', IMG + 'a-draw2.webp', 4, TIMING.YOUR_TURN,
+    'Draw 2 Action cards!'),
 
-  new ActionCard('a_double',
-    'Double Trouble', '22.png', 2, 'any_time',
-    'Give any player (including yourself) an immediate extra turn with all normal actions and draws.'),
+  new ActionCard('a_double', 'Double Trouble', IMG + 'a-double.webp', 2, TIMING.ANY_TIME,
+    'Take an extra turn or make another player take one. The turn includes all normal actions and draws.'),
 
-  new ActionCard('a_recover',
-    'Recover', '23.png', 1, 'your_turn',
-    'Take 1 card from the Action discard pile and add it to your hand, then discard 1 from your hand.'),
+  new ActionCard('a_recover', 'Recover', IMG + 'a-recover.webp', 1, TIMING.YOUR_TURN,
+    'Choose 1 Action card from the discard pile and add it to your hand.'),
 ];
 
 const CHARACTER_CARDS = [
-  new CharacterCard('c_carl',  'Curious Carl',   '24.png', 3,
-    'Look at the top 2 Danger cards and rearrange their order.',
-    'active'),
+  new CharacterCard('c_carl', 'Curious Carl', IMG + 'c-carl.webp', 3, TIMING.YOUR_TURN,
+    'Look at the top 2 Whoopsies cards and rearrange them in any order.'),
 
-  new CharacterCard('c_rosie', 'Reckless Rosie', '30.png', 3,
-    'Roll 1 die on a Danger card. Roll 4 or higher to avoid damage.',
-    'active'),
+  new CharacterCard('c_casey', 'Cautious Casey', IMG + 'c-casey.webp', 3, TIMING.YOUR_TURN,
+    'After resolving a Whoopsies card, you may draw 1 Action card.'),
 
-  new CharacterCard('c_sammy', 'Silly Sammy',    '1.png',  3,
-    'Swap 1 Action card from your hand with the top card of the Action deck.',
-    'active'),
+  new CharacterCard('c_pete', 'Prankster Pete', IMG + 'c-pete.webp', 4, TIMING.YOUR_TURN,
+    'Choose 1 card from your hand and trade it for 1 card from another player\'s hand.'),
 
-  new CharacterCard('c_nina',  'Naive Nina',     '29.png', 3,
-    'Ask one player to reveal their entire hand to you. (No stealing unless you use Take 1.)',
-    'active'),
+  new CharacterCard('c_bella', 'Bold Bella', IMG + 'c-bella.webp', 3, TIMING.YOUR_TURN,
+    'Look at the top 2 Action cards of the Action deck. Rearrange them and place them back on top.'),
 
-  new CharacterCard('c_luke',  'Lucky Luke',     '28.png', 3,
-    'When someone plays Take 1 or Swap Hands on you: roll a die. Roll 4+ to cancel it.',
-    'any_time'),
+  new CharacterCard('c_luke', 'Lucky Luke', IMG + 'c-luke.webp', 3, TIMING.REACTION,
+    'Roll a die. On a 4 or higher, cancel a Take 1 or Swap Hands card\'s effect.'),
 
-  new CharacterCard('c_bella', 'Bold Bella',     '27.png', 3,
-    'Look at the top 2 Action cards from the Action deck.',
-    'active'),
+  new CharacterCard('c_nina', 'Naive Nina', IMG + 'c-nina.webp', 3, TIMING.YOUR_TURN,
+    'Choose a player to reveal their entire hand. Flip a coin, heads or tails. If you called it right, trash 1 card from their hand.'),
 
-  new CharacterCard('c_pete',  'Prankster Pete', '26.png', 3,
-    'Swap 1 card from your hand with 1 card from another player\'s hand.',
-    'active'),
+  new CharacterCard('c_rosie', 'Reckless Rosie', IMG + 'c-rosie.webp', 3, TIMING.ANY_TIME,
+    'Roll 1 die on a Whoopsies card. If you roll a 4 or higher, avoid the damage.'),
 
-  new CharacterCard('c_casey', 'Cautious Casey', '25.png', 3,
-    'After resolving a Danger card, draw 1 Action card.',
-    'passive'),
+  new CharacterCard('c_mel', 'Melo Mel', IMG + 'c-mel.webp', 3, TIMING.ANY_TIME,
+    'Re-roll any dice roll.'),
 
-  new CharacterCard('c_lou',   'Grumpy Lou',     '1.png',  3,
-    'Roll a die. On 4 or higher, redirect a Danger card to any player of your choice.',
-    'active'),
+  new CharacterCard('c_franky', 'Franky Ice', IMG + 'c-franky.webp', 2, TIMING.YOUR_TURN,
+    'Choose a player. They can only play 1 Action card during their next turn.'),
 
-  new CharacterCard('c_mel',   'Melo Mel',       '31.png', 3,
-    'Used Any Time: reroll any dice roll once.',
-    'any_time'),
+  new CharacterCard('c_lou', 'Grumpy Lou', IMG + 'c-lou.webp', 3, TIMING.REACTION,
+    'After a Whoopsies card is revealed, put it on the bottom of the Whoopsies deck and reveal a new one.'),
+
+  new CharacterCard('c_rick', 'Slick Rick', IMG + 'c-rick.webp', 3, TIMING.REACTION,
+    'Whenever a player plays an Action card, you may use the effect as well.'),
+
+  new CharacterCard('c_fester', 'Fester the Cat', IMG + 'c-fester.webp', 3, TIMING.YOUR_TURN,
+    'Discard a card from your hand to give a player a Whoopsies card from the top of the deck.'),
 ];
+
+const CARD_BACKS = {
+  action:    IMG + 'back-action.webp',
+  whoopsies: IMG + 'back-whoopsies.webp',
+};

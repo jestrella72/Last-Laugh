@@ -25,13 +25,14 @@ class Deck {
   #discarded = [];
 
   constructor(cardDefinitions) {
-    // Expand every card definition into (copies) instances
+    // Expand every card definition into (copies) instances.
+    // Object.create keeps the class methods/getters (canPlayAnytime…)
+    // while giving every copy its own instanceId.
     for (const def of cardDefinitions) {
       for (let i = 0; i < def.copies; i++) {
-        // Spread operator copies all properties into a new object,
-        // then we add a unique instanceId so two copies of the same
-        // card can be told apart.
-        this.#cards.push({ ...def, instanceId: `${def.id}_${i}` });
+        const copy = Object.create(def);
+        copy.instanceId = `${def.id}_${i}`;
+        this.#cards.push(copy);
       }
     }
     this.shuffle();
@@ -46,8 +47,16 @@ class Deck {
     }
   }
 
-  // Take the top card. Returns null if deck is empty.
-  draw() { return this.#cards.shift() ?? null; }
+  // Take the top card. When the draw pile runs out, the discard
+  // pile is shuffled back in. Returns null only if both are empty.
+  draw() {
+    if (this.#cards.length === 0 && this.#discarded.length > 0) {
+      this.#cards     = this.#discarded;
+      this.#discarded = [];
+      this.shuffle();
+    }
+    return this.#cards.shift() ?? null;
+  }
 
   // Draw multiple at once
   drawMany(n) {
@@ -69,8 +78,10 @@ class Deck {
     this.#cards.unshift(...newOrder.map(i => top[i]));
   }
 
+  putOnBottom(card) { this.#cards.push(card); }
+
   discard(card)     { this.#discarded.push(card); }
-  getAllDiscards()   { return [...this.#discarded]; }
+  getAllDiscards()  { return [...this.#discarded]; }
   getTopDiscard()   { return this.#discarded[this.#discarded.length - 1] ?? null; }
 
   recoverFromDiscard(instanceId) {
@@ -81,12 +92,10 @@ class Deck {
   /*
    * OOP CONCEPT #4 — GETTERS (reminder)
    * Read these like properties:  deck.size  (no parentheses)
-   * The get keyword tells JS to run the function when you
-   * access the property name.
    */
   get size()        { return this.#cards.length; }
   get discardSize() { return this.#discarded.length; }
-  get isEmpty()     { return this.#cards.length === 0; }
+  get isEmpty()     { return this.#cards.length === 0 && this.#discarded.length === 0; }
 }
 
 // =============================================================
@@ -97,24 +106,22 @@ class Deck {
  *
  *  A Player HAS a character card.
  *  A Player HAS a hand (array of action cards).
- *  Compare with inheritance: DangerCard IS A Card.
- *
- *  Composition = building complex objects by nesting simpler
- *  objects inside them rather than inheriting from them.
+ *  Compare with inheritance: WhoopsiesCard IS A Card.
  * └─────────────────────────────────────────────────────────┘
  */
 
 class Player {
   constructor(id, name, character, lives) {
-    this.id           = id;
-    this.name         = name;
-    this.character    = character;   // CharacterCard  (composition!)
-    this.lives        = lives;
-    this.maxLives     = lives;
-    this.hand         = [];          // array of ActionCard instances
-    this.abilitiesLeft = 3;          // tracked by dice in physical game
-    this.isEliminated = false;
-    this.skipNextTurn = false;
+    this.id            = id;
+    this.name          = name;
+    this.character     = character;        // CharacterCard  (composition!)
+    this.lives         = lives;
+    this.maxLives      = lives;
+    this.hand          = [];               // array of ActionCard instances
+    this.abilitiesLeft = character.uses;   // the ace icons on the card
+    this.isEliminated  = false;
+    this.skipNextTurn  = false;
+    this.frozen        = false;            // Franky Ice: only 1 Action card next turn
   }
 
   loseLife(amount = 1) {
@@ -125,12 +132,12 @@ class Player {
 
   gainLife(amount = 1) {
     this.lives = Math.min(this.maxLives, this.lives + amount);
-    if (this.lives > 0) this.isEliminated = false;
   }
 
-  isAlive()    { return this.lives > 0; }
-  hasCards(n)  { return this.hand.length >= n; }
+  isAlive()       { return !this.isEliminated; }
+  hasCards(n)     { return this.hand.length >= n; }
   canUseAbility() { return this.abilitiesLeft > 0 && !this.isEliminated; }
+  hasCard(id)     { return this.hand.some(c => c.id === id); }
 
   useAbility() {
     if (this.abilitiesLeft > 0) { this.abilitiesLeft--; return true; }
@@ -160,16 +167,16 @@ class Player {
  *  Game is the single source of truth for all game state.
  *  The UI reads from Game and calls Game methods.
  *  Game methods update state; the UI re-renders after.
- *
- *  This separation keeps the logic clean and testable.
  * └─────────────────────────────────────────────────────────┘
  */
 
 class Game {
+  static STARTING_HAND = 5;
+
   constructor(playerSetups) {
     // Player count determines starting lives
-    const count        = playerSetups.length;
-    const startLives   = count <= 3 ? 3 : count <= 5 ? 2 : 1;
+    const count      = playerSetups.length;
+    const startLives = count <= 3 ? 3 : count <= 5 ? 2 : 1;
 
     // Build Player objects  (composition: Game HAS players)
     this.players = playerSetups.map((setup, i) =>
@@ -177,93 +184,136 @@ class Game {
     );
 
     // Build decks  (composition: Game HAS decks)
-    this.dangerDeck = new Deck(DANGER_CARDS);
-    this.actionDeck = new Deck(ACTION_CARDS);
+    this.whoopsiesDeck = new Deck(WHOOPSIES_CARDS);
+    this.actionDeck    = new Deck(ACTION_CARDS);
 
-    // Turn & round state
-    this.currentPlayerIdx  = 0;
-    this.dangerTargetIdx   = 0;    // who is actually resolving the danger
-    this.currentDanger     = null; // the active DangerCard instance
-    this.turn              = 1;
-    this.winner            = null;
+    // Turn state
+    this.currentPlayerIdx = 0;
+    this.turn             = 1;
+    this.winner           = null;
+    this.actionsThisTurn  = 0;     // counts Action cards for Franky Ice
 
-    // Round-wide modifier flags
-    this.safetyFirstActive = false;
-    this.dangerNegated     = false;  // Not Today was played
+    // The Whoopsies card currently being faced (null between turns)
+    this.currentWhoopsies = null;
+    this.whoopsiesTargetIdx = 0;
+
+    // Safety First: nobody loses life until this player's next turn
+    this.safetyOwnerIdx = null;
+
+    // Double Trouble: queue of player ids who get an extra turn
+    this.extraTurns  = [];
+    this.resumeAfter = null;       // whose turn normal order continues from
 
     // Game log — most recent entry first
     this.log = [];
 
     // Deal starting hands
     for (const p of this.players) {
-      p.hand = this.actionDeck.drawMany(5);
+      p.hand = this.actionDeck.drawMany(Game.STARTING_HAND);
     }
   }
 
   // ── Convenience getters ──────────────────────────────────
 
-  get currentPlayer()  { return this.players[this.currentPlayerIdx]; }
-  get dangerTarget()   { return this.players[this.dangerTargetIdx]; }
-  get activePlayers()  { return this.players.filter(p => !p.isEliminated); }
+  get currentPlayer()   { return this.players[this.currentPlayerIdx]; }
+  get whoopsiesTarget() { return this.players[this.whoopsiesTargetIdx]; }
+  get activePlayers()   { return this.players.filter(p => !p.isEliminated); }
+  get safetyActive()    { return this.safetyOwnerIdx !== null; }
 
   // ── Utility methods ──────────────────────────────────────
 
-  addLog(msg) {
-    this.log.unshift({ text: msg, turn: this.turn });
-    if (this.log.length > 50) this.log.pop();
+  addLog(msg, kind = 'log') {
+    this.log.unshift({ text: msg, turn: this.turn, kind });
+    if (this.log.length > 120) this.log.pop();
   }
 
   /*
    * OOP CONCEPT #8 — STATIC METHODS
    * A static method belongs to the CLASS, not to an instance.
    * Call it as  Game.rollDie()  not  myGame.rollDie().
-   * Use static for utility functions that don't need "this".
    */
-  static rollDie() {
-    return Math.floor(Math.random() * 6) + 1;
-  }
+  static rollDie()  { return Math.floor(Math.random() * 6) + 1; }
+  static flipCoin() { return Math.random() < 0.5 ? 'heads' : 'tails'; }
 
-  // Get the index of the next living player clockwise
+  // Next living player clockwise (to the left)
   nextPlayerAfter(idx) {
     const total = this.players.length;
-    let next    = (idx + 1) % total;
-    let checks  = 0;
-    while (this.players[next].isEliminated && checks < total) {
+    let next = (idx + 1) % total;
+    for (let i = 0; i < total && this.players[next].isEliminated; i++) {
       next = (next + 1) % total;
-      checks++;
     }
     return next;
   }
 
-  playerToLeft(idx) { return this.nextPlayerAfter(idx); }
+  // Previous living player (to the right)
+  prevPlayerBefore(idx) {
+    const total = this.players.length;
+    let prev = (idx - 1 + total) % total;
+    for (let i = 0; i < total && this.players[prev].isEliminated; i++) {
+      prev = (prev - 1 + total) % total;
+    }
+    return prev;
+  }
+
+  playerToLeft(idx)  { return this.nextPlayerAfter(idx); }
+  playerToRight(idx) { return this.prevPlayerBefore(idx); }
+
+  // Life loss goes through here so Safety First is respected.
+  // Returns true if a life was actually lost.
+  damage(player, { unstoppable = false } = {}) {
+    if (this.safetyActive && !unstoppable) {
+      this.addLog(`🛡️ Safety First protects ${player.name}!`);
+      return false;
+    }
+    player.loseLife();
+    this.addLog(`💔 ${player.name} loses 1 life (${player.lives} left).`, 'hurt');
+    if (player.isEliminated) this.addLog(`💀 ${player.name} has been eliminated!`, 'hurt');
+    return true;
+  }
 
   checkWinner() {
     const alive = this.activePlayers;
     if (alive.length <= 1) {
       this.winner = alive[0] ?? null;
-      if (this.winner) this.addLog(`🏆 ${this.winner.name} wins the game!`);
+      if (this.winner) this.addLog(`🏆 ${this.winner.name} gets the Last Laugh!`);
       return true;
     }
     return false;
   }
 
-  // Reset per-round flags and advance to the next player
-  advanceTurn(overrideNextIdx = null) {
-    this.safetyFirstActive = false;
-    this.dangerNegated     = false;
-    this.currentDanger     = null;
+  // Move to the next turn. Returns the list of players skipped.
+  advanceTurn() {
+    this.currentWhoopsies = null;
+    this.actionsThisTurn  = 0;
     this.turn++;
 
-    let next = overrideNextIdx ?? this.nextPlayerAfter(this.currentPlayerIdx);
+    let next;
+    if (this.extraTurns.length) {
+      if (this.resumeAfter === null) this.resumeAfter = this.currentPlayerIdx;
+      next = this.extraTurns.shift();
+      if (this.players[next].isEliminated) return this.advanceTurn();
+    } else {
+      next = this.nextPlayerAfter(this.resumeAfter ?? this.currentPlayerIdx);
+      this.resumeAfter = null;
+    }
 
-    // Handle skip flag
-    if (this.players[next].skipNextTurn) {
+    const skipped = [];
+    for (let i = 0; i < this.players.length && this.players[next].skipNextTurn; i++) {
       this.players[next].skipNextTurn = false;
-      this.addLog(`${this.players[next].name}'s turn was skipped!`);
+      skipped.push(this.players[next]);
+      this.addLog(`⏭️ ${this.players[next].name}'s turn is skipped!`);
       next = this.nextPlayerAfter(next);
     }
 
-    this.currentPlayerIdx = next;
-    this.dangerTargetIdx  = next;
+    // Safety First wears off when its owner's turn comes back around
+    if (this.safetyOwnerIdx !== null &&
+        (this.safetyOwnerIdx === next || this.players[this.safetyOwnerIdx].isEliminated)) {
+      this.safetyOwnerIdx = null;
+      this.addLog('Safety First wears off.');
+    }
+
+    this.currentPlayerIdx   = next;
+    this.whoopsiesTargetIdx = next;
+    return skipped;
   }
 }

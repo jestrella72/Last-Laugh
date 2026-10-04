@@ -1,128 +1,85 @@
 # Last Laugh — Card Game
 
-A fully playable browser-based digital version of the **Last Laugh** trading card game, built with **vanilla JavaScript** and **OOP principles** for learning.
+A pass-and-play browser version of the **Last Laugh** card game, built with **vanilla JavaScript** and **OOP principles** for learning. Vintage rubber-hose cartoon look, the final card art, a ragtime soundtrack, and plenty of "FAHHH".
 
-## 🎮 How to Play
+## 🎮 Run it
 
-1. **Start the server:**
-   ```bash
-   python -m http.server 8090
-   ```
+```bash
+python -m http.server 8090
+```
 
-2. **Open in browser:**
-   ```
-   http://localhost:8090
-   ```
+Then open http://localhost:8090. (Opening `index.html` straight from disk also works in most browsers.)
 
-3. **Game setup:**
-   - Choose 2-6 players
-   - Each player enters their name and selects a character
-   - Each player starts with 3 lives (adjusts based on player count)
-   - Deal 5 Action cards to each player
+## 📖 How to play
 
-4. **Turn flow:**
-   - Flip a Danger card from the deck
-   - Players react with Action cards
-   - Resolve the danger based on card effects
-   - Advance to next player's turn
+**Goal:** be the last player with lives left. You get the Last Laugh!
 
-5. **Win condition:**
-   - Last player standing wins!
+**Setup**
+- 2–8 players on one device. Everyone picks a character. The aces printed on the card show how many times you can use its ability (Prankster Pete has 4, Franky Ice has 2, everyone else has 3).
+- Everyone gets 5 Action cards.
+- Lives: 3 each with 2–3 players, 2 with 4–5, 1 with 6–8.
 
-## 📚 OOP Learning
+**On your turn**
+1. Draw 1 Action card.
+2. Play any **During Your Turn** cards or use your ability.
+3. Flip the top **Whoopsies** card. It's aimed at you.
+4. Before it resolves, anyone can react with **Play At Any Time** or **Reaction** cards and abilities: Redirect, Slip Away, Not Today!, Grumpy Lou, Reckless Rosie…
+5. Whoever it ends up aimed at resolves it. Then the next player to the left goes.
 
-This project teaches core OOP concepts through working code:
+**Timing tags** (same colours as the printed cards)
+| Tag | When |
+|---|---|
+| ⬛ During Your Turn | Only on your own turn, before you flip |
+| 🟦 Play At Any Time | Whenever it makes sense |
+| 🟥 Reaction | In response to something (a Whoopsies, an Action card, a Take 1…) |
 
-| Concept | Location |
-|---------|----------|
-| **Classes & Constructors** | `cards.js` — `Card`, `DangerCard`, `ActionCard`, `CharacterCard` |
-| **Inheritance** (`extends`/`super`) | Child classes extend `Card` and call parent constructor |
-| **Polymorphism** | Each card type overrides `describe()` differently |
-| **Encapsulation** (private fields `#`) | `Deck.#cards` — hidden array with public methods |
-| **Composition** | `Player` has a `character`; `Game` has `players` and `decks` |
-| **Static methods** | `Game.rollDie()` — belongs to class, not instances |
-| **Getters** | `get canPlayAnytime`, `get size`, `get isEmpty` |
+**Cancel** can stop any Action card (and a Cancel can be Cancelled). The game asks automatically whenever someone plays a card. **Drove wearing sunglasses at night** can only be stopped by Slip Away or Redirect.
 
-**Read the comments in `cards.js` and `game.js`** — each concept is explained with plain English.
+## 🃏 The cards
+
+**Whoopsies (37):** Forgot to tie shoelaces near a cliff ×5, Tried to pet a shark ×5, Took a bath with a toaster ×5, Tried to hug a bear ×5, Danced on wet tiles ×5, Ate mystery leftovers ×2, Texting while driving ×2, Drove wearing sunglasses at night ×3, Out of Luck!! ×3, Miraculous Escape! ×2
+
+**Action (43):** Not Today! ×5, Slip Away ×4, Redirect ×4, Second Chance ×4, Cancel ×4, Peek Ahead ×4, Safety First ×2, Take 1 ×5, Swap Hands ×2, Skip Your Turn ×2, Draw 2 ×4, Double Trouble ×2, Recover ×1
+
+**Characters (12):** Curious Carl, Cautious Casey, Prankster Pete, Bold Bella, Lucky Luke, Naive Nina, Reckless Rosie, Melo Mel, Franky Ice, Grumpy Lou, Slick Rick, Fester the Cat
+
+Card counts are set in `cards.js`. Change the `copies` number to rebalance.
+
+## ✨ Extras
+
+- **Redirect alert:** when a Whoopsies is pushed onto you (Redirect, Slip Away, the bear, Out of Luck!!, Fester), a shocked face pops up: "This is being REDIRECTED to you!" with the FAHHH sound.
+- **Losing a life** plays FAHHH with a heart-break flash.
+- **Table Talk:** a text box beside the table. Pick who's talking, type, or tap a quick line. Messages also pop up as speech bubbles over that player.
+- **Soundtrack:** a ragtime piano loop generated in the browser (no music file needed). 🎵 toggles music, 🔊 toggles sound effects.
+- Dice and coin animations, card flip reveals, and confetti for the winner.
 
 ## 📁 Files
 
-- **`cards.js`** (550 lines)
-  - Card base class + 3 subclasses
-  - All 36 danger cards, 50 action cards, 10 character cards defined
-  - Heavy OOP lesson comments
+| File | What it holds |
+|---|---|
+| `cards.js` | `Card` → `WhoopsiesCard`, `ActionCard`, `CharacterCard` classes and every card in the game |
+| `game.js` | `Deck`, `Player`, `Game`: the rules and the state |
+| `sound.js` | `SoundManager`: the music loop and sound effects |
+| `app.js` | The UI controller: setup, turns, reactions, card effects, alerts |
+| `index.html` / `styles.css` | Page layout and the vintage cartoon look |
+| `images/cards/` | Final card art (WebP) |
+| `images/redirect-emoji.png`, `sounds/fahhh.mp3` | The redirect face and the FAHHH |
 
-- **`game.js`** (300 lines)
-  - `Deck` class with shuffle, draw, peek, rearrange methods
-  - `Player` class with life/ability tracking
-  - `Game` class as the "source of truth" for all game state
-  - OOP comments on encapsulation & composition
+## 📚 OOP learning
 
-- **`index.html`** (1400+ lines)
-  - Complete game UI with CSS styling (green felt table aesthetic)
-  - Game controller that orchestrates Deck/Player/Game classes
-  - Modal dialogs for interactions (pick cards, choose targets, roll dice, etc)
-  - Hotseat support (players pass device between turns)
+| Concept | Where |
+|---|---|
+| **Classes & constructors** | `cards.js`: `Card`, `WhoopsiesCard`, `ActionCard`, `CharacterCard` |
+| **Inheritance** (`extends`/`super`) | Card subclasses call the parent constructor |
+| **Polymorphism** | Each card type overrides `describe()` |
+| **Encapsulation** (private `#` fields) | `Deck.#cards`, `SoundManager.#ctx` |
+| **Composition** | `Player` has a `character`; `Game` has `players` and decks |
+| **Static members** | `Game.rollDie()`, `Game.flipCoin()`, `SoundManager.BPM` |
+| **Getters** | `canPlayAnytime`, `timingLabel`, `size`, `safetyActive` |
+| **async / await** | `app.js`: every question to the players is a Promise |
 
-- **`1.png` — `31.png`**
-  - Card images for all unique card types
-
-## 🎯 Game Rules (Quick Summary)
-
-### Danger Cards
-Flip one each turn. Players react with Action cards to avoid/modify effects:
-- **Toaster Bath** — Discard 1 card or lose 1 life
-- **Shark** — Lose 1 life if you have <3 cards in hand
-- **Wet Tiles** — Roll die; 4+ is safe
-- **Bear Hug** — Pass to another player or lose 1 life
-- ...and 6 more unique dangers (36 total copies)
-
-### Action Cards
-Play during reactions or on your turn to affect the game:
-- **Not Today!** — Negate a danger entirely
-- **Redirect** — Force another player to face the danger
-- **Slip Away** — Pass danger to player on your left
-- **Second Chance** — Survive without losing a life
-- ...and 10 more card types (50 total copies)
-
-### Character Abilities
-Each player picks a character with a special 3-use ability:
-- **Curious Carl** — Peek & rearrange top 2 Danger cards
-- **Reckless Rosie** — Roll die to avoid damage
-- **Lucky Luke** — Cancel Take 1/Swap Hands on 4+
-- ...and 7 more
-
-## 🚀 Features
-
-✅ 2-6 player hotseat mode (pass device between turns)
-✅ Full danger resolution system with 10 card types
-✅ 50 unique action cards with complex interactions
-✅ 10 playable characters with abilities
-✅ Dice rolling with reroll support
-✅ Multi-step reactions & responses
-✅ Game log tracking all actions
-✅ Modal dialogs for choices (pick cards, targets, etc)
-✅ Responsive design (desktop & mobile)
-
-## 🔧 Architecture
-
-- **Separation of concerns:** Game engine (classes) ≠ UI rendering
-- **Source of truth:** `G` (Game instance) is the single source of truth
-- **Event-driven:** User clicks → updates game state → re-render board
-- **Stateful UI:** Phase machine tracks game progress (setup → pre-flip → reacting → resolving → game-over)
-
-## 📖 To Learn OOP
-
-1. Read `cards.js` top-to-bottom — each class is explained
-2. Read `game.js` top-to-bottom — focus on `Deck` and `Game` encapsulation
-3. Open `index.html` in browser and watch how the UI calls game methods
-4. Try modifying a card's effect or adding a new character ability
+The guides in `OOP_LEARNING_GUIDE.md`, `OOP_MISTAKES.md` and `CODE_EXAMPLES.md` walk through these ideas with small standalone examples.
 
 ## 🎓 License
 
-MIT — Free to learn, modify, and share!
-
----
-
-**Built with:** Vanilla JavaScript (no frameworks), HTML5, CSS3
-**For:** Learning OOP principles through a complete, playable game
+MIT. Free to learn, modify, and share!
