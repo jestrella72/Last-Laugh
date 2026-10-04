@@ -214,7 +214,7 @@ const CHARACTER_CARDS = [
     'Choose a player. They can only play 1 Action card during their next turn.'),
 
   new CharacterCard('c_lou', 'Grumpy Lou', IMG + 'c-lou.webp', 3, TIMING.REACTION,
-    'After a Whoopsies card is revealed, put it on the bottom of the Whoopsies deck and reveal a new one.'),
+    'On your turn, after your Whoopsies card is revealed, put it on the bottom of the Whoopsies deck and reveal a new one.'),
 
   new CharacterCard('c_rick', 'Slick Rick', IMG + 'c-rick.webp', 3, TIMING.REACTION,
     'Whenever a player plays an Action card, you may use the effect as well.'),

@@ -114,7 +114,7 @@ class Bot {
       else if (has('a_slip'))      choice = { type: 'card', card: has('a_slip') };
       else if (has('a_not_today')) choice = { type: 'card', card: has('a_not_today') };
       else if (bot.canUseAbility() && bot.character.id === 'c_rosie') choice = { type: 'rosie' };
-      else if (bot.canUseAbility() && bot.character.id === 'c_lou' && Bot.coin(.7)) choice = { type: 'lou' };
+      else if (bot.canUseAbility() && bot.character.id === 'c_lou' && bot.id === G.currentPlayerIdx && Bot.coin(.7)) choice = { type: 'lou' };
     }
     if (!choice && has('a_second_chance') && bot.lives < bot.maxLives) {
       choice = { type: 'card', card: has('a_second_chance') };

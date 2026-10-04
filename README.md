@@ -46,6 +46,8 @@ Then open http://localhost:8090.
 | 🟦 Play At Any Time | Whenever it makes sense |
 | 🟥 Reaction | In response to something (a Whoopsies, an Action card, a Take 1…) |
 
+**Only the player whose turn it is flips a Whoopsies.** Between your turns, other players can send you **at most 2 Whoopsies** (Redirect, Slip Away, the bear, Out of Luck!!, Fester) on top of your own flip. Grumpy Lou's swap only works on Lou's own turn.
+
 **Tried to hug a bear** can be passed on once, when it's revealed. Whoever gets handed the bear loses the life.
 
 **Cancel** can stop any Action card, and Cancels stack (Cancel the Cancel, and so on). **Redirects stack** too: whoever a Whoopsies is redirected to can Redirect it again. **Not Today!** can be played at any time, even right before a Whoopsies takes your life. The game asks automatically whenever someone plays a card. **Drove wearing sunglasses at night** can only be stopped by Slip Away or Redirect.

@@ -71,6 +71,7 @@ function chipEl(p, { flags = true } = {}) {
     if (p.skipNextTurn) f.push('<span title="Next turn skipped">⏭️</span>');
     if (p.frozen || (p.frozenThisTurn && G.currentPlayerIdx === p.id)) f.push('<span title="Franky Ice: 1 Action card only">❄️</span>');
     if (G.extraTurns.includes(p.id)) f.push('<span title="Extra turn coming">➕</span>');
+    if (p.whoopsiesReceived) f.push(`<span title="Whoopsies sent to them by others this round (max ${Game.MAX_RECEIVED})">⚠️${p.whoopsiesReceived}/${Game.MAX_RECEIVED}</span>`);
   }
   d.innerHTML = `
     <div class="chip-flags">${f.join('')}</div>
@@ -324,6 +325,7 @@ function redirectAlert(toPlayer, why) {
 async function redirectTo(idx, why) {
   G.whoopsiesTargetIdx = idx;
   const p = G.players[idx];
+  p.whoopsiesReceived++;
   G.addLog(`👉 "${G.currentWhoopsies.name}" is redirected to ${p.name}! (${why})`, 'redirect');
   renderAll();
   await redirectAlert(p, why);
@@ -745,6 +747,7 @@ async function startTurn() {
                { force: true, kicker: 'It\'s your turn', button: `I'm ${p.name}, show my cards` });
   p.frozenThisTurn = p.frozen;
   p.frozen = false;
+  p.whoopsiesReceived = 0;   // a new round of "sent to you" starts now
   if (p.isBot) {
     renderAll();
     try { await runBotTurn(p); }
@@ -1110,7 +1113,7 @@ const EFFECTS = {
   },
 
   async a_redirect(p) {
-    const others = G.activePlayers.filter(o => o.id !== G.whoopsiesTargetIdx);
+    const others = G.activePlayers.filter(o => o.id !== G.whoopsiesTargetIdx && G.canReceive(o));
     const t = await pickPlayer('Redirect', 'Who faces this Whoopsies instead?', others, { kicker: p.name, who: p });
     botSay(p, 'redirect');
     await redirectTo(t.id, `${p.name} played Redirect`);
@@ -1137,7 +1140,8 @@ function canUseTurnAbility(p) {
       if (!others.some(o => o.hand.length)) return { ok: false, reason: 'Nobody has a card to trade.' };
       return { ok: true };
     case 'c_fester':
-      return p.hand.length ? { ok: true } : { ok: false, reason: 'You need a card to discard.' };
+      if (!p.hand.length) return { ok: false, reason: 'You need a card to discard.' };
+      return others.some(o => G.canReceive(o)) ? { ok: true } : { ok: false, reason: 'Everyone has faced 2 Whoopsies from others already.' };
     default:
       return { ok: true };
   }
@@ -1213,11 +1217,12 @@ const ABILITIES = {
     const card = await pickFromHand(p, 'Fester the Cat 🐈‍⬛', 'Discard a card to send a Whoopsies at someone.');
     p.removeFromHand(card.instanceId);
     G.actionDeck.discard(card);
-    const others = G.activePlayers.filter(o => o.id !== p.id);
+    const others = G.activePlayers.filter(o => o.id !== p.id && G.canReceive(o));
     const t = await pickPlayer('Fester the Cat 🐈‍⬛', 'Who gets the top Whoopsies card?', others, { who: p });
     G.addLog(`🐈‍⬛ ${p.name} (Fester) deals ${t.name} a Whoopsies card!`);
     const w = G.whoopsiesDeck.draw();
     G.currentWhoopsies = w;
+    t.whoopsiesReceived++;
     await redirectAlert(t, `${p.name}'s Fester the Cat dealt you a Whoopsies`);
     await faceWhoopsies(w, t.id, { revealed: true });
   },
@@ -1290,7 +1295,8 @@ async function reactionWindow() {
 function hasReaction(p) {
   if (p.hand.some(c => canReact(p, c).ok)) return true;
   if (!p.canUseAbility()) return false;
-  return p.character.id === 'c_lou' || (p.character.id === 'c_rosie' && p.id === G.whoopsiesTargetIdx);
+  return (p.character.id === 'c_lou' && p.id === G.currentPlayerIdx) ||
+         (p.character.id === 'c_rosie' && p.id === G.whoopsiesTargetIdx);
 }
 
 function canReact(reactor, c) {
@@ -1310,8 +1316,13 @@ function canReact(reactor, c) {
       if (!isTarget) return { ok: false, reason: 'Only the target' };
       return w.unstoppable ? { ok: false, reason: 'Can\'t stop this one' } : { ok: true };
     case 'a_redirect':
+      if (!isTarget) return { ok: false, reason: 'Only the target' };
+      return G.activePlayers.some(o => o.id !== reactor.id && G.canReceive(o))
+        ? { ok: true } : { ok: false, reason: 'Everyone has 2 already' };
     case 'a_slip':
-      return isTarget ? { ok: true } : { ok: false, reason: 'Only the target' };
+      if (!isTarget) return { ok: false, reason: 'Only the target' };
+      return G.canReceive(G.players[G.playerToLeft(reactor.id)])
+        ? { ok: true } : { ok: false, reason: 'Left player has 2 already' };
     case 'a_second_chance':
       return reactor.lives < reactor.maxLives ? { ok: true } : { ok: false, reason: 'Full life' };
     case 'a_double':
@@ -1330,7 +1341,7 @@ async function reactorTurn(reactor) {
   const abilityButtons = [];
   if (reactor.canUseAbility()) {
     if (ch.id === 'c_rosie' && isTarget) abilityButtons.push({ label: `🎲 Reckless Rosie (${reactor.abilitiesLeft} left)`, cls: 'btn-purple', value: 'rosie' });
-    if (ch.id === 'c_lou') abilityButtons.push({ label: `🥊 Grumpy Lou: swap it (${reactor.abilitiesLeft} left)`, cls: 'btn-purple', value: 'lou' });
+    if (ch.id === 'c_lou' && reactor.id === G.currentPlayerIdx) abilityButtons.push({ label: `🥊 Grumpy Lou: swap it (${reactor.abilitiesLeft} left)`, cls: 'btn-purple', value: 'lou' });
   }
 
   const v = await ask({
@@ -1484,7 +1495,12 @@ const RESOLVERS = {
   // "When this card enters play" you may pass it on — once.
   // Whoever is handed the bear takes the hug (loses 1 life).
   async w_bear(t) {
-    const others = G.activePlayers.filter(o => o.id !== t.id);
+    const others = G.activePlayers.filter(o => o.id !== t.id && G.canReceive(o));
+    if (!others.length) {
+      await info('Tried to hug a bear 🐻', `Everyone else has already faced 2 Whoopsies from other players this round. ${t.name} keeps the bear.`);
+      await hurt(t);
+      return;
+    }
     const v = t.isBot ? Bot.pickPlayer(t, others).id : await ask({
       kicker: '🐻 Tried to hug a bear', title: `${t.name}, pass the bear?`,
       body: 'Choose another player to take this Whoopsies card, or keep it and lose 1 life.',
@@ -1548,10 +1564,16 @@ const RESOLVERS = {
         return;
       }
       const leftIdx = G.playerToLeft(t.id), rightIdx = G.playerToRight(t.id);
-      let to = leftIdx;
-      if (leftIdx !== rightIdx && t.isBot) {
+      const canL = G.canReceive(G.players[leftIdx]), canR = G.canReceive(G.players[rightIdx]);
+      if (!canL && !canR) {
+        G.addLog(`🎰 ${t.name} rolled ${r}, but both neighbours already faced 2 Whoopsies this round.`);
+        await info('Nobody to pass it to', `${t.name} rolled ${r}, but both neighbours have already faced 2 Whoopsies from others this round. Nothing happens.`);
+        return;
+      }
+      let to = canL ? leftIdx : rightIdx;
+      if (canL && canR && leftIdx !== rightIdx && t.isBot) {
         to = Bot.leader([G.players[leftIdx], G.players[rightIdx]]).id;
-      } else if (leftIdx !== rightIdx) {
+      } else if (canL && canR && leftIdx !== rightIdx) {
         to = await ask({
           kicker: '🎰 Out of Luck!!', title: `${t.name} rolled ${r}! Pass it on`,
           body: 'Pass this card left or right. They must roll for it immediately.',
@@ -1616,6 +1638,8 @@ function showRules() {
       <ul>
         <li><b>Cancel</b> can stop any Action card, and Cancels stack: Cancel the Cancel, and so on. The game asks automatically.</li>
         <li><b>Redirects stack:</b> whoever a Whoopsies gets redirected to can Redirect it again.</li>
+        <li><b>Only the player whose turn it is flips a Whoopsies.</b> Everyone else waits for their turn.</li>
+        <li><b>Max 2 sent to you:</b> between your turns, other players can send you at most 2 Whoopsies (Redirect, Slip Away, the bear, Out of Luck!!, Fester), on top of your own flip. The ⚠️ badge on a player shows how many they've had.</li>
         <li><b>Not Today!</b> can be played at any time, even right before a Whoopsies takes your life.</li>
         <li><b>Drove wearing sunglasses at night</b> can only be stopped by Slip Away or Redirect.</li>
         <li>Lose all your lives and you're out. Use the 💬 Table Talk box to taunt your friends.</li>

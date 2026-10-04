@@ -123,6 +123,7 @@ class Player {
     this.isEliminated  = false;
     this.skipNextTurn  = false;
     this.frozen        = false;            // Franky Ice: only 1 Action card next turn
+    this.whoopsiesReceived = 0;            // sent by others since your last turn (max 2)
   }
 
   loseLife(amount = 1) {
@@ -173,6 +174,7 @@ class Player {
 
 class Game {
   static STARTING_HAND = 5;
+  static MAX_RECEIVED  = 2;   // Whoopsies others can send you per round (plus your own flip)
 
   constructor(playerSetups) {
     // Player count determines starting lives
@@ -222,6 +224,9 @@ class Game {
   get activePlayers()   { return this.players.filter(p => !p.isEliminated); }
   get safetyActive()    { return this.safetyOwnerIdx !== null; }
   get humans()          { return this.players.filter(p => !p.isBot); }
+
+  // Can another player still send p a Whoopsies this round?
+  canReceive(p) { return !p.isEliminated && p.whoopsiesReceived < Game.MAX_RECEIVED; }
 
   // ── Utility methods ──────────────────────────────────────
 
