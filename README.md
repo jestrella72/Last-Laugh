@@ -2,13 +2,26 @@
 
 A pass-and-play browser version of the **Last Laugh** card game, built with **vanilla JavaScript** and **OOP principles** for learning. Vintage rubber-hose cartoon look, the final card art, a ragtime soundtrack, and plenty of "FAHHH".
 
-## 🎮 Run it
+## 🎮 Play it
+
+**Online:** https://jestrella72.github.io/Last-Laugh/ (works on iPhone, Android and desktop; share the link!)
+
+On a phone, use **Add to Home Screen** (Safari share menu on iPhone, ⋮ menu in Chrome on Android) and it opens full-screen like an app.
+
+**Locally:**
 
 ```bash
 python -m http.server 8090
 ```
 
-Then open http://localhost:8090. (Opening `index.html` straight from disk also works in most browsers.)
+Then open http://localhost:8090.
+
+### 🤖 Playing with bots
+
+- Tap **Solo test: you vs 3 bots** to jump straight into a game against the computer.
+- Or pick a player count and switch any seat to **🤖 Bot**. You can mix humans and bots.
+- Bots play cards, use their abilities, react to Whoopsies (Redirect, Slip Away, Not Today!…), Cancel your cards and pick on whoever's winning. They even trash-talk in Table Talk.
+- With only one human, there are no pass-the-device screens. You just play.
 
 ## 📖 How to play
 
@@ -32,6 +45,8 @@ Then open http://localhost:8090. (Opening `index.html` straight from disk also w
 | ⬛ During Your Turn | Only on your own turn, before you flip |
 | 🟦 Play At Any Time | Whenever it makes sense |
 | 🟥 Reaction | In response to something (a Whoopsies, an Action card, a Take 1…) |
+
+**Tried to hug a bear** can be passed on once, when it's revealed. Whoever gets handed the bear loses the life.
 
 **Cancel** can stop any Action card (and a Cancel can be Cancelled). The game asks automatically whenever someone plays a card. **Drove wearing sunglasses at night** can only be stopped by Slip Away or Redirect.
 
@@ -60,6 +75,7 @@ Card counts are set in `cards.js`. Change the `copies` number to rebalance.
 | `cards.js` | `Card` → `WhoopsiesCard`, `ActionCard`, `CharacterCard` classes and every card in the game |
 | `game.js` | `Deck`, `Player`, `Game`: the rules and the state |
 | `sound.js` | `SoundManager`: the music loop and sound effects |
+| `bots.js` | `Bot`: how computer players make every decision |
 | `app.js` | The UI controller: setup, turns, reactions, card effects, alerts |
 | `index.html` / `styles.css` | Page layout and the vintage cartoon look |
 | `images/cards/` | Final card art (WebP) |

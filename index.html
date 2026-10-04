@@ -2,9 +2,20 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>Last Laugh</title>
-  <link rel="icon" href="images/cards/back-action.webp">
+  <meta name="description" content="Last Laugh — a cartoon card game. Dodge the Whoopsies, pass them on, and be the last one laughing.">
+  <meta name="theme-color" content="#ffd84d">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Last Laugh">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta property="og:title" content="Last Laugh">
+  <meta property="og:description" content="Dodge the Whoopsies, pass them on, and be the last one laughing.">
+  <meta property="og:image" content="images/icon-512.png">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="images/icon-180.png">
+  <link rel="icon" type="image/png" href="images/icon-192.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Luckiest+Guy&family=Nunito:wght@600;700;800&display=swap" rel="stylesheet">
@@ -33,11 +44,19 @@
     <h2>How many players?</h2>
     <p class="sub">Pass-and-play on one device. Everyone gets a character and 5 Action cards.</p>
     <div class="count-row" id="count-row"></div>
+    <div class="solo-row">
+      <button class="btn btn-purple btn-big" onclick="startSolo(4)">🤖 Solo test: you vs 3 bots</button>
+      <span class="sub">Or pick a number above and turn any seat into a bot.</span>
+    </div>
   </div>
 
   <div class="panel" id="setup-char" style="display:none">
     <h2 id="setup-title">Player 1</h2>
     <p class="sub">Type your name and pick a character. The aces on a card show how many times you can use its ability.</p>
+    <div class="seat-toggle" role="group" aria-label="Who plays this seat">
+      <button type="button" class="btn" id="seat-human" onclick="setSeatBot(false)">🙂 Human</button>
+      <button type="button" class="btn" id="seat-bot"   onclick="setSeatBot(true)">🤖 Bot</button>
+    </div>
     <div class="name-row">
       <input id="name-input" type="text" placeholder="Your name…" maxlength="14" autocomplete="off">
       <button class="btn btn-plain" onclick="pickRandomCharacter()">🎲 Random</button>
@@ -181,6 +200,7 @@
 <script src="cards.js"></script>
 <script src="game.js"></script>
 <script src="sound.js"></script>
+<script src="bots.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

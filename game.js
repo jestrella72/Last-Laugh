@@ -111,9 +111,10 @@ class Deck {
  */
 
 class Player {
-  constructor(id, name, character, lives) {
+  constructor(id, name, character, lives, isBot = false) {
     this.id            = id;
     this.name          = name;
+    this.isBot         = isBot;            // computer player (see bots.js)
     this.character     = character;        // CharacterCard  (composition!)
     this.lives         = lives;
     this.maxLives      = lives;
@@ -180,7 +181,7 @@ class Game {
 
     // Build Player objects  (composition: Game HAS players)
     this.players = playerSetups.map((setup, i) =>
-      new Player(i, setup.name, setup.character, startLives)
+      new Player(i, setup.name, setup.character, startLives, !!setup.isBot)
     );
 
     // Build decks  (composition: Game HAS decks)
@@ -219,6 +220,7 @@ class Game {
   get whoopsiesTarget() { return this.players[this.whoopsiesTargetIdx]; }
   get activePlayers()   { return this.players.filter(p => !p.isEliminated); }
   get safetyActive()    { return this.safetyOwnerIdx !== null; }
+  get humans()          { return this.players.filter(p => !p.isBot); }
 
   // ── Utility methods ──────────────────────────────────────
 

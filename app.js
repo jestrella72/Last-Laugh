@@ -20,8 +20,18 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 const esc   = s  => String(s).replace(/[&<>"']/g,
   c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
-// Unlock audio on the first click anywhere (browsers require it)
-document.addEventListener('pointerdown', () => SFX.unlock());
+// Unlock audio on the first tap anywhere (browsers require it;
+// iPhones want it on touchend, so listen for all of them)
+for (const ev of ['pointerdown', 'touchend', 'click', 'keydown']) {
+  document.addEventListener(ev, () => SFX.unlock(), { passive: true });
+}
+
+const botTurn = () => G && G.currentPlayer.isBot;
+
+// Bots post in Table Talk now and then
+function botSay(bot, kind, chance = .5) {
+  if (bot.isBot && Math.random() < chance) setTimeout(() => sendChat(Bot.line(kind), bot), 700);
+}
 
 // =============================================================
 //  SMALL BUILDING BLOCKS
@@ -104,10 +114,33 @@ function toast(text, card = null) {
  *   buttons: [{ label, cls, value, disabled }]
  * Resolves with the value of whatever was clicked.
  */
+let modalSeq = 0;
+
 function ask({ title, kicker = '', body = '', html = '', cards = [], players = [],
-               buttons = [], wide = false, single = false }) {
+               buttons = [], wide = false, single = false, auto = null }) {
   return new Promise(resolve => {
-    const done = v => { $('modal-overlay').classList.remove('open'); resolve(v); };
+    const seq = ++modalSeq;
+    let closed = false;
+    const done = v => {
+      if (closed) return;
+      closed = true;
+      $('modal-overlay').classList.remove('open');
+      resolve(v);
+    };
+
+    // While a bot is playing, plain "OK" pop-ups close by themselves
+    const passive = buttons.length <= 1 && !players.length && !cards.some(c => c.value !== undefined);
+    const autoMs  = auto ?? (botTurn() && passive ? 1700 : 0);
+    if (autoMs) {
+      const started = Date.now();
+      const tick = () => {
+        if (closed || seq !== modalSeq) return;
+        const b = $('modal-buttons').querySelector('button:not(:disabled)');
+        if (Date.now() - started >= autoMs && b) b.click();
+        else setTimeout(tick, 250);
+      };
+      setTimeout(tick, 250);
+    }
 
     $('modal-box').className = wide ? 'wide' : '';
     $('modal-kicker').textContent = kicker;
@@ -172,13 +205,16 @@ const yesNo = (title, body, yes = 'Yes', no = 'No', extra = {}) =>
     { label: no,  cls: 'btn-plain', value: false },
   ]});
 
-async function pickPlayer(title, body, players, { kicker = '', cancel = null } = {}) {
+// `who` is the player making the choice: bots answer instantly.
+async function pickPlayer(title, body, players, { kicker = '', cancel = null, who = null, purpose = 'harm' } = {}) {
+  if (who?.isBot) return Bot.pickPlayer(who, players, purpose);
   const buttons = cancel ? [{ label: cancel, cls: 'btn-plain', value: -1 }] : [];
   const v = await ask({ title, body, kicker, players, buttons, wide: players.length > 3 });
   return v === -1 ? null : G.players[v];
 }
 
-async function pickFromHand(player, title, body, { cancel = null, kicker = '' } = {}) {
+async function pickFromHand(player, title, body, { cancel = null, kicker = '', who = player, purpose = 'discard' } = {}) {
+  if (who.isBot) return Bot.pickCard(who, player.hand, purpose);
   const cards   = player.hand.map(c => ({ card: c, value: c.instanceId }));
   const buttons = cancel ? [{ label: cancel, cls: 'btn-plain', value: null }] : [];
   const id = await ask({ title, body, kicker, cards, buttons, wide: cards.length > 3 });
@@ -186,7 +222,8 @@ async function pickFromHand(player, title, body, { cancel = null, kicker = '' } 
 }
 
 // Tap cards in the order you want them (first tap = top of deck)
-async function arrange(kicker, title, cards) {
+async function arrange(kicker, title, cards, who = null, kind = 'whoopsies') {
+  if (who?.isBot) return Bot.arrange(who, cards, kind);
   let picked = [];
   for (;;) {
     const v = await ask({
@@ -215,6 +252,14 @@ async function arrange(kicker, title, cards) {
 // =============================================================
 
 function passTo(player, msg, { force = false, kicker = 'Pass the device to', button } = {}) {
+  // Bots don't need the device, and with one human there's nobody to hide from
+  if (player.isBot) return Promise.resolve();
+  if (G.humans.length === 1) {
+    viewerIdx = player.id;
+    if (force) toast(`🎉 Your turn, ${player.name}!`);
+    renderAll();
+    return Promise.resolve();
+  }
   if (!force && viewerIdx === player.id) return Promise.resolve();
   viewerIdx = null;
   renderAll();
@@ -250,7 +295,10 @@ function revealWhoopsies(card, target) {
     const s = $('reveal-screen');
     restartAnimations(s);
     s.classList.add('open');
-    $('reveal-btn').onclick = () => { s.classList.remove('open'); resolve(); };
+    let closed = false;
+    const close = () => { if (closed) return; closed = true; s.classList.remove('open'); resolve(); };
+    $('reveal-btn').onclick = close;
+    if (target.isBot) setTimeout(close, 2300);
   });
 }
 
@@ -266,7 +314,10 @@ function redirectAlert(toPlayer, why) {
     restartAnimations(s);
     s.classList.add('open');
     $('redirect-btn').focus({ preventScroll: true });
-    $('redirect-btn').onclick = () => { s.classList.remove('open'); resolve(); };
+    let closed = false;
+    const close = () => { if (closed) return; closed = true; s.classList.remove('open'); resolve(); };
+    $('redirect-btn').onclick = close;
+    if (toPlayer.isBot) setTimeout(close, 2600);
   });
 }
 
@@ -289,6 +340,7 @@ async function hurt(player, opts = {}) {
     return false;
   }
   SFX.fahhh();
+  botSay(player, 'hurt', .6);
   await new Promise(resolve => {
     $('hurt-title').textContent = player.isEliminated ? `${player.name} is OUT!` : `${player.name} loses a life!`;
     $('hurt-sub').textContent   = player.isEliminated ? '💀 No lives left.' : `${'❤️'.repeat(player.lives)} left`;
@@ -311,9 +363,9 @@ function dieHTML(n) {
   return Array.from({ length: 9 }, (_, i) => `<i class="${on.includes(i) ? 'on' : ''}"></i>`).join('');
 }
 
-async function diceAnimation(value, caption) {
+async function diceAnimation(value, caption, auto = null) {
   SFX.dice();
-  const p = ask({
+  const p = ask({ auto,
     kicker: '🎲 Roll!', title: caption,
     html: `<div class="die rolling" id="die">${dieHTML(1)}</div><div class="roll-result" id="roll-result">…</div>`,
     buttons: [{ label: 'OK', cls: 'btn-yellow', value: true }],
@@ -336,10 +388,20 @@ async function diceAnimation(value, caption) {
 // Roll a die for someone. Any Melo Mel at the table may re-roll it.
 async function roll(player, reason) {
   let value = Game.rollDie();
-  await diceAnimation(value, `${player.name} — ${reason}`);
+  await diceAnimation(value, `${player.name} — ${reason}`, player.isBot ? 1900 : null);
   G.addLog(`🎲 ${player.name} rolled a ${value} (${reason}).`);
   for (;;) {
-    const mels = G.activePlayers.filter(p => p.character.id === 'c_mel' && p.canUseAbility());
+    const allMels = G.activePlayers.filter(p => p.character.id === 'c_mel' && p.canUseAbility());
+    const botMel  = allMels.find(m => m.isBot && Bot.wantsReroll(m, player, value, reason));
+    if (botMel) {
+      botMel.useAbility();
+      value = Game.rollDie();
+      G.addLog(`🎵 ${botMel.name} (Melo Mel) re-rolls… ${value}!`);
+      renderAll();
+      await diceAnimation(value, `${botMel.name} re-rolls for ${player.name}`);
+      continue;
+    }
+    const mels = allMels.filter(m => !m.isBot);
     if (!mels.length) break;
     const v = await ask({
       kicker: 'Melo Mel', title: `Re-roll that ${value}?`,
@@ -386,19 +448,29 @@ async function coinFlip(caller, call) {
 // =============================================================
 
 let setupCount = 0, setupPlayers = [], setupChoice = null;
+let setupSeatBot = false;   // is the seat being set up a bot?
+let setupSolo    = false;   // "Solo test": fill the other seats with bots
+
+const BOT_NAMES = {
+  c_carl: 'Carl', c_casey: 'Casey', c_pete: 'Pete', c_bella: 'Bella', c_luke: 'Luke', c_nina: 'Nina',
+  c_rosie: 'Rosie', c_mel: 'Mel', c_franky: 'Franky', c_lou: 'Lou', c_rick: 'Rick', c_fester: 'Fester',
+};
 
 function renderCountButtons() {
   const row = $('count-row');
   for (let n = 2; n <= 8; n++) row.appendChild(btnEl(String(n), 'btn-yellow', () => startSetup(n)));
 }
 
-function startSetup(n) {
+function startSetup(n, solo = false) {
   setupCount   = n;
   setupPlayers = [];
+  setupSolo    = solo;
   $('setup-count').style.display = 'none';
   $('setup-char').style.display  = 'block';
   renderCharSelect();
 }
+
+function startSolo(n) { startSetup(n, true); }
 
 function setupBack() {
   if (setupPlayers.length) {
@@ -410,11 +482,22 @@ function setupBack() {
   }
 }
 
+function setSeatBot(isBot) {
+  setupSeatBot = isBot;
+  $('seat-human').className = 'btn ' + (isBot ? 'btn-plain' : 'btn-yellow');
+  $('seat-bot').className   = 'btn ' + (isBot ? 'btn-purple' : 'btn-plain');
+  $('name-input').placeholder = isBot ? 'Bot name (optional)' : 'Your name…';
+}
+
 function renderCharSelect() {
   const lives = setupCount <= 3 ? 3 : setupCount <= 5 ? 2 : 1;
-  $('setup-title').textContent = `Player ${setupPlayers.length + 1} of ${setupCount}  ·  ${lives} ${lives === 1 ? 'life' : 'lives'} each`;
+  $('setup-title').textContent = setupSolo
+    ? `Solo test · you vs ${setupCount - 1} bots · ${lives} ${lives === 1 ? 'life' : 'lives'} each`
+    : `Player ${setupPlayers.length + 1} of ${setupCount}  ·  ${lives} ${lives === 1 ? 'life' : 'lives'} each`;
   $('name-input').value = '';
   setupChoice = null;
+  setSeatBot(false);
+  document.querySelector('.seat-toggle').style.display = setupSolo ? 'none' : '';
   const taken = setupPlayers.map(p => p.character.id);
   const grid  = $('char-grid');
   grid.innerHTML = '';
@@ -440,21 +523,45 @@ function selectCharacter(id) {
     el.classList.toggle('selected', el.dataset.id === id));
 }
 
-function pickRandomCharacter() {
+function randomFreeCharacter() {
   const taken = setupPlayers.map(p => p.character.id);
   const free  = CHARACTER_CARDS.filter(c => !taken.includes(c.id));
-  selectCharacter(free[Math.floor(Math.random() * free.length)].id);
+  return free[Math.floor(Math.random() * free.length)];
+}
+
+function pickRandomCharacter() {
+  selectCharacter(randomFreeCharacter().id);
   document.querySelector('.char-option.selected')?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
 }
 
+function addBotSeat(character) {
+  let name = `Bot ${BOT_NAMES[character.id]}`;
+  for (let i = 2; setupPlayers.some(p => p.name === name); i++) name = `Bot ${BOT_NAMES[character.id]} ${i}`;
+  setupPlayers.push({ name, character, isBot: true });
+}
+
 async function confirmCharacter() {
-  const name = $('name-input').value.trim() || `Player ${setupPlayers.length + 1}`;
+  if (setupSeatBot && !setupChoice) setupChoice = randomFreeCharacter();
   if (!setupChoice) { await info('Pick a character!', 'Tap one of the character cards first.'); return; }
-  if (setupPlayers.some(p => p.name.toLowerCase() === name.toLowerCase())) {
-    await info('Name taken', 'Two players can\'t share a name. Try another one.');
+  const isLastSeat = setupPlayers.length === setupCount - 1;
+  if (setupSeatBot && isLastSeat && !setupPlayers.some(p => !p.isBot)) {
+    await info('Need a human!', 'At least one seat has to be a real player.');
     return;
   }
-  setupPlayers.push({ name, character: setupChoice });
+  const typed = $('name-input').value.trim();
+  if (setupSeatBot && !typed) {
+    addBotSeat(setupChoice);
+  } else {
+    const name = typed || `Player ${setupPlayers.length + 1}`;
+    if (setupPlayers.some(p => p.name.toLowerCase() === name.toLowerCase())) {
+      await info('Name taken', "Two players can't share a name. Try another one.");
+      return;
+    }
+    setupPlayers.push({ name, character: setupChoice, isBot: setupSeatBot });
+  }
+  if (setupSolo) {
+    while (setupPlayers.length < setupCount) addBotSeat(randomFreeCharacter());
+  }
   if (setupPlayers.length >= setupCount) startGame();
   else renderCharSelect();
 }
@@ -464,6 +571,7 @@ $('name-input').addEventListener('keydown', e => { if (e.key === 'Enter') confir
 function startGame() {
   G = new Game(setupPlayers);
   G.addLog(`Welcome to Last Laugh! ${G.players.length} players, ${G.players[0].maxLives} ${G.players[0].maxLives === 1 ? 'life' : 'lives'} each.`, 'turn');
+  if (G.humans.length === 1) viewerIdx = G.humans[0].id;
   $('setup-screen').classList.remove('active');
   $('game-screen').classList.add('active');
   setupChat();
@@ -480,7 +588,7 @@ function renderAll() {
   renderPlayers();
   renderTable();
   renderFeed();
-  if (!busy) renderMain(); else renderHand();
+  if (!busy || botTurn()) renderMain(); else renderHand();
 }
 
 function renderPlayers() {
@@ -580,7 +688,8 @@ const QUICK_LINES = ['FAHHH!', 'Not today! 😤', 'Sorry not sorry 😈', 'Nooo!
 
 function setupChat() {
   const sel = $('chat-speaker');
-  sel.innerHTML = G.players.map(p => `<option value="${p.id}">${esc(p.name)} says…</option>`).join('');
+  sel.innerHTML = G.humans.map(p => `<option value="${p.id}">${esc(p.name)} says…</option>`).join('');
+  sel.style.display = G.humans.length > 1 ? '' : 'none';
   $('quick-row').innerHTML = '';
   for (const line of QUICK_LINES) {
     const b = document.createElement('button');
@@ -598,8 +707,7 @@ function setupChat() {
   };
 }
 
-function sendChat(text) {
-  const who = G.players[+$('chat-speaker').value];
+function sendChat(text, who = G.players[+$('chat-speaker').value]) {
   G.log.unshift({ kind: 'chat', who: who.name, text, turn: G.turn });
   renderFeed();
   $('feed').scrollTop = $('feed').scrollHeight;
@@ -622,7 +730,7 @@ function sendChat(text) {
 async function startTurn() {
   const p = G.currentPlayer;
   busy = true;
-  setChatSpeaker(p);
+  if (!p.isBot) setChatSpeaker(p);
   G.addLog(`— Turn ${G.turn}: ${p.name} —`, 'turn');
   await passTo(p, 'Draw 1 Action card, play cards if you like, then flip a Whoopsies!',
                { force: true, kicker: 'It\'s your turn', button: `I'm ${p.name}, show my cards` });
@@ -634,9 +742,40 @@ async function startTurn() {
     G.addLog(`${p.name} draws an Action card.`);
     SFX.flip();
   }
+  if (p.isBot) {
+    renderAll();
+    try { await runBotTurn(p); }
+    catch (e) { if (!(e instanceof GameOver)) { console.error(e); endTurn(); } }
+    finally { busy = false; }
+    return;
+  }
   busy = false;
   renderAll();
   renderHand(drawn?.instanceId);
+}
+
+// A bot's whole turn: play a few cards, maybe use its ability, flip.
+async function runBotTurn(p) {
+  await sleep(900);
+  for (let i = 0; i < 2 && !G.winner; i++) {
+    const card = Bot.chooseTurnCard(p);
+    if (!card) break;
+    const res = await playAction(p, card);
+    renderAll();
+    if (res === 'end_turn') return endTurn();
+    await sleep(800);
+  }
+  if (Bot.wantsAbility(p)) {
+    p.useAbility();
+    G.addLog(`✨ ${p.name} uses ${p.character.name}.`);
+    toast(`✨ ${p.name} uses ${p.character.name}!`, p.character);
+    renderAll();
+    await ABILITIES[p.character.id](p);
+    renderAll();
+    await sleep(800);
+  }
+  await faceWhoopsies(G.whoopsiesDeck.draw(), p.id);
+  return endTurn();
 }
 
 function setChatSpeaker(p) {
@@ -647,6 +786,13 @@ function setChatSpeaker(p) {
 function renderMain() {
   const p = G.currentPlayer;
   $('panel-title').textContent = `${p.name}'s turn`;
+  if (p.isBot) {
+    $('panel-title').textContent = `🤖 ${p.name} is playing…`;
+    $('panel-sub').textContent = "Sit back and watch. You'll get a chance to react when a Whoopsies comes up.";
+    $('panel-buttons').innerHTML = '';
+    renderHand();
+    return;
+  }
 
   let sub = 'Play any cards you want, then flip a Whoopsies. Tap a card to read it.';
   if (p.frozenThisTurn) sub = `❄️ Franky Ice froze you: only 1 Action card this turn${G.actionsThisTurn ? ' (used)' : ''}. ` + sub;
@@ -784,15 +930,19 @@ async function playAction(player, card) {
 async function cancelWindow(player, card) {
   const holders = G.activePlayers.filter(p => p.id !== player.id && p.hasCard('a_cancel'));
   if (!holders.length) return true;
-  const v = await ask({
-    kicker: '✋ Cancel?', title: `${player.name} plays ${card.name}`,
-    body: 'Anyone with a Cancel card can stop it right now.',
-    cards: [{ card }],
-    buttons: [
-      ...holders.map(h => ({ label: `${h.name}: Cancel it!`, cls: 'btn-red', value: h.id })),
-      { label: 'Let it happen', cls: 'btn-plain', value: -1 },
-    ],
-  });
+  let v = holders.find(h => h.isBot && Bot.wantsCancel(h, player, card))?.id ?? -1;
+  const humanHolders = holders.filter(h => !h.isBot);
+  if (v === -1 && humanHolders.length) {
+    v = await ask({
+      kicker: '✋ Cancel?', title: `${player.name} plays ${card.name}`,
+      body: 'You can stop it right now with a Cancel card.',
+      cards: [{ card }],
+      buttons: [
+        ...humanHolders.map(h => ({ label: `${h.name}: Cancel it!`, cls: 'btn-red', value: h.id })),
+        { label: 'Let it happen', cls: 'btn-plain', value: -1 },
+      ],
+    });
+  }
   if (v === -1) return true;
   const canceller = G.players[v];
   const cancelCard = canceller.hand.find(c => c.id === 'a_cancel');
@@ -813,7 +963,7 @@ async function rickCopy(player, card) {
   const ricks = G.activePlayers.filter(r => r.id !== player.id && r.character.id === 'c_rick' && r.canUseAbility());
   for (const r of ricks) {
     if (card.id === 'a_second_chance' && r.lives >= r.maxLives) continue;
-    const yes = await yesNo('Slick Rick 🎩', `${r.name}, use ${card.name}'s effect for yourself too? (${r.abilitiesLeft} uses left)`,
+    const yes = r.isBot ? Bot.wantsCopy(card) : await yesNo('Slick Rick 🎩', `${r.name}, use ${card.name}'s effect for yourself too? (${r.abilitiesLeft} uses left)`,
                             'Copy it!', 'No thanks', { kicker: 'Reaction', cards: [{ card: r.character }] });
     if (!yes) continue;
     r.useAbility();
@@ -828,7 +978,7 @@ async function rickCopy(player, card) {
 // Lucky Luke may cancel a Take 1 / Swap Hands aimed at them
 async function luckyLukeBlocks(target, cardName) {
   if (target.character.id !== 'c_luke' || !target.canUseAbility()) return false;
-  const yes = await yesNo('Lucky Luke 🍀', `${target.name}, roll to cancel ${cardName}? You need a 4 or higher. (${target.abilitiesLeft} uses left)`,
+  const yes = target.isBot || await yesNo('Lucky Luke 🍀', `${target.name}, roll to cancel ${cardName}? You need a 4 or higher. (${target.abilitiesLeft} uses left)`,
                           'Roll for it!', 'No', { kicker: 'Reaction', cards: [{ card: target.character }] });
   if (!yes) return false;
   target.useAbility();
@@ -855,7 +1005,7 @@ const EFFECTS = {
   async a_take1(p) {
     const targets = G.activePlayers.filter(o => o.id !== p.id && o.hand.length);
     if (!targets.length) { await info('Take 1', 'Nobody has any cards to take.'); return; }
-    const t = await pickPlayer('Take 1', 'Take a random Action card from who?', targets, { kicker: p.name });
+    const t = await pickPlayer('Take 1', 'Take a random Action card from who?', targets, { kicker: p.name, who: p, purpose: 'cards' });
     if (await luckyLukeBlocks(t, 'Take 1')) return;
     const stolen = t.stealRandomCard();
     p.hand.push(stolen);
@@ -865,7 +1015,7 @@ const EFFECTS = {
 
   async a_swap(p) {
     const targets = G.activePlayers.filter(o => o.id !== p.id);
-    const t = await pickPlayer('Swap Hands', 'Swap your whole hand with…', targets, { kicker: p.name, cancel: 'Don\'t swap' });
+    const t = await pickPlayer('Swap Hands', 'Swap your whole hand with…', targets, { kicker: p.name, cancel: 'Don\'t swap', who: p, purpose: 'cards' });
     if (!t) return;
     if (await luckyLukeBlocks(t, 'Swap Hands')) return;
     [p.hand, t.hand] = [t.hand, p.hand];
@@ -883,7 +1033,7 @@ const EFFECTS = {
   async a_peek(p) {
     const top = G.whoopsiesDeck.peekTop(3);
     if (!top.length) return;
-    const order = await arrange('Peek Ahead', 'The next Whoopsies cards', top);
+    const order = await arrange('Peek Ahead', 'The next Whoopsies cards', top, p);
     G.whoopsiesDeck.rearrangeTop(order);
     G.addLog(`🔮 ${p.name} peeks at and rearranges the Whoopsies deck.`);
   },
@@ -895,7 +1045,7 @@ const EFFECTS = {
   },
 
   async a_skip(p, { copy }) {
-    const t = await pickPlayer('Skip Your Turn', 'Whose turn gets skipped? (You can pick yourself.)', G.activePlayers, { kicker: p.name });
+    const t = await pickPlayer('Skip Your Turn', 'Whose turn gets skipped? (You can pick yourself.)', G.activePlayers, { kicker: p.name, who: p });
     if (t.id === p.id && p.id === G.currentPlayerIdx && !copy && !G.currentWhoopsies) {
       G.addLog(`⏭️ ${p.name} skips the rest of their turn. No Whoopsies!`);
       return 'end_turn';
@@ -905,7 +1055,7 @@ const EFFECTS = {
   },
 
   async a_double(p) {
-    const t = await pickPlayer('Double Trouble', 'Who takes an extra turn right after this one?', G.activePlayers, { kicker: p.name });
+    const t = await pickPlayer('Double Trouble', 'Who takes an extra turn right after this one?', G.activePlayers, { kicker: p.name, who: p, purpose: 'help' });
     G.extraTurns.push(t.id);
     G.addLog(`➕ Double Trouble: ${t.name} gets an extra turn!`);
   },
@@ -913,7 +1063,7 @@ const EFFECTS = {
   async a_recover(p) {
     const pile = G.actionDeck.getAllDiscards().filter(c => c.id !== 'a_recover');
     if (!pile.length) { await info('Recover', 'Nothing worth recovering in the discard pile.'); return; }
-    const id = await ask({ kicker: 'Recover', title: 'Take 1 card from the discard pile', wide: true,
+    const id = p.isBot ? Bot.pickCard(p, pile, 'recover').instanceId : await ask({ kicker: 'Recover', title: 'Take 1 card from the discard pile', wide: true,
                            cards: pile.map(c => ({ card: c, value: c.instanceId })) });
     const card = G.actionDeck.recoverFromDiscard(id);
     p.hand.push(card);
@@ -924,13 +1074,15 @@ const EFFECTS = {
   async a_not_today(p) {
     G.addLog(`🛑 NOT TODAY! ${p.name} shrugs off "${G.currentWhoopsies.name}".`);
     SFX.good();
+    botSay(p, 'dodge');
     await info('Not Today!', `${p.name} stops the Whoopsies cold.`);
     return 'negated';
   },
 
   async a_redirect(p) {
     const others = G.activePlayers.filter(o => o.id !== G.whoopsiesTargetIdx);
-    const t = await pickPlayer('Redirect', 'Who faces this Whoopsies instead?', others, { kicker: p.name });
+    const t = await pickPlayer('Redirect', 'Who faces this Whoopsies instead?', others, { kicker: p.name, who: p });
+    botSay(p, 'redirect');
     await redirectTo(t.id, `${p.name} played Redirect`);
   },
 
@@ -977,34 +1129,34 @@ function onAbility() {
 
 const ABILITIES = {
   async c_carl(p) {
-    const order = await arrange('Curious Carl', 'The next 2 Whoopsies cards', G.whoopsiesDeck.peekTop(2));
+    const order = await arrange('Curious Carl', 'The next 2 Whoopsies cards', G.whoopsiesDeck.peekTop(2), p);
     G.whoopsiesDeck.rearrangeTop(order);
   },
 
   async c_bella(p) {
     const top = G.actionDeck.peekTop(2);
     if (!top.length) return;
-    const order = await arrange('Bold Bella', 'The next 2 Action cards', top);
+    const order = await arrange('Bold Bella', 'The next 2 Action cards', top, p, 'action');
     G.actionDeck.rearrangeTop(order);
   },
 
   async c_pete(p) {
     const targets = G.activePlayers.filter(o => o.id !== p.id && o.hand.length);
-    const t = await pickPlayer('Prankster Pete', 'Trade a card with who?', targets);
+    const t = await pickPlayer('Prankster Pete', 'Trade a card with who?', targets, { who: p });
     const give = await pickFromHand(p, 'Prankster Pete', `Pick the card you'll give ${t.name}.`);
     const got = t.stealRandomCard();
     p.removeFromHand(give.instanceId);
     t.hand.push(give);
     p.hand.push(got);
     G.addLog(`🥧 ${p.name} (Prankster Pete) trades a card with ${t.name}.`);
-    await info('Trade!', `You gave ${give.name} and got ${got.name}.`, { cards: [{ card: got }] });
+    if (!p.isBot) await info('Trade!', `You gave ${give.name} and got ${got.name}.`, { cards: [{ card: got }] });
   },
 
   async c_nina(p) {
     const others = G.activePlayers.filter(o => o.id !== p.id);
-    const t = await pickPlayer('Naive Nina', 'Whose hand gets revealed?', others);
+    const t = await pickPlayer('Naive Nina', 'Whose hand gets revealed?', others, { who: p, purpose: 'cards' });
     G.addLog(`👀 ${p.name} (Naive Nina) reveals ${t.name}'s hand.`);
-    const call = await ask({
+    const call = p.isBot ? (t.hand.length ? Game.flipCoin() : null) : await ask({
       kicker: 'Naive Nina', title: `${t.name}'s hand`, wide: true,
       body: t.hand.length ? 'Now call the coin. Call it right and you trash 1 of these cards.' : `${t.name} has no cards!`,
       cards: t.hand.map(c => ({ card: c })),
@@ -1014,7 +1166,7 @@ const ABILITIES = {
     });
     if (!call) return;
     if (!(await coinFlip(p, call))) { G.addLog(`🪙 ${p.name} called it wrong.`); return; }
-    const card = await pickFromHand(t, `Trash 1 of ${t.name}'s cards`, 'Pick the card to throw away.', { kicker: 'Naive Nina' });
+    const card = await pickFromHand(t, `Trash 1 of ${t.name}'s cards`, 'Pick the card to throw away.', { kicker: 'Naive Nina', who: p, purpose: 'trash' });
     t.removeFromHand(card.instanceId);
     G.actionDeck.discard(card);
     G.addLog(`🗑️ ${p.name} trashes ${t.name}'s ${card.name}!`);
@@ -1022,7 +1174,7 @@ const ABILITIES = {
 
   async c_franky(p) {
     const others = G.activePlayers.filter(o => o.id !== p.id);
-    const t = await pickPlayer('Franky Ice ❄️', 'Who can only play 1 Action card next turn?', others);
+    const t = await pickPlayer('Franky Ice ❄️', 'Who can only play 1 Action card next turn?', others, { who: p });
     t.frozen = true;
     G.addLog(`❄️ ${p.name} (Franky Ice) freezes ${t.name}: only 1 Action card next turn.`);
   },
@@ -1032,7 +1184,7 @@ const ABILITIES = {
     p.removeFromHand(card.instanceId);
     G.actionDeck.discard(card);
     const others = G.activePlayers.filter(o => o.id !== p.id);
-    const t = await pickPlayer('Fester the Cat 🐈‍⬛', 'Who gets the top Whoopsies card?', others);
+    const t = await pickPlayer('Fester the Cat 🐈‍⬛', 'Who gets the top Whoopsies card?', others, { who: p });
     G.addLog(`🐈‍⬛ ${p.name} (Fester) deals ${t.name} a Whoopsies card!`);
     const w = G.whoopsiesDeck.draw();
     G.currentWhoopsies = w;
@@ -1048,6 +1200,7 @@ const ABILITIES = {
 async function faceWhoopsies(card, targetIdx, { revealed = false } = {}) {
   G.currentWhoopsies   = card;
   G.whoopsiesTargetIdx = targetIdx;
+  Bot.tried.clear();
   G.addLog(`⚠️ Whoopsies! ${G.whoopsiesTarget.name} faces "${card.name}".`, 'whoops');
   renderAll();
   if (!revealed) await revealWhoopsies(card, G.whoopsiesTarget);
@@ -1066,17 +1219,49 @@ async function faceWhoopsies(card, targetIdx, { revealed = false } = {}) {
 async function reactionWindow() {
   for (;;) {
     const w = G.currentWhoopsies, t = G.whoopsiesTarget;
+
+    // Bots get first say (the target bot before the others)
+    const bots = G.activePlayers.filter(p => p.isBot)
+      .sort((a, b) => (b.id === G.whoopsiesTargetIdx) - (a.id === G.whoopsiesTargetIdx));
+    let botReacted = false;
+    for (const b of bots) {
+      const choice = Bot.reaction(b);
+      if (!choice) continue;
+      botReacted = true;
+      await sleep(500);
+      const r = await doReaction(b, choice);
+      if (r === 'negated' || r === 'avoided') return r;
+      break;
+    }
+    if (botReacted) continue;
+
+    // Only bother humans who actually have something they could do
+    const humans = G.activePlayers.filter(p => !p.isBot && hasReaction(p));
+    if (!humans.length) return 'resolve';
+
+    const solo = G.humans.length === 1;
     const v = await ask({
-      kicker: '⚠️ Whoopsies!', title: w.name, wide: true,
-      body: `${t.name} is facing this. Anyone want to react first? Tap your name.`,
+      kicker: '⚠️ Whoopsies!', title: w.name, wide: !solo,
+      body: solo
+        ? `${t.name} is facing this. Want to react before it resolves?`
+        : `${t.name} is facing this. Anyone want to react first? Tap your name.`,
       cards: [{ card: w }],
-      players: G.activePlayers,
-      buttons: [{ label: 'No reactions — resolve it!', cls: 'btn-red', value: 'resolve' }],
+      players: solo ? [] : humans,
+      buttons: [
+        ...(solo ? [{ label: '🃏 React!', cls: 'btn-yellow', value: humans[0].id }] : []),
+        { label: solo ? 'No, resolve it' : 'No reactions — resolve it!', cls: 'btn-red', value: 'resolve' },
+      ],
     });
     if (v === 'resolve') return 'resolve';
     const r = await reactorTurn(G.players[v]);
     if (r === 'negated' || r === 'avoided') return r;
   }
+}
+
+function hasReaction(p) {
+  if (p.hand.some(c => canReact(p, c).ok)) return true;
+  if (!p.canUseAbility()) return false;
+  return p.character.id === 'c_lou' || (p.character.id === 'c_rosie' && p.id === G.whoopsiesTargetIdx);
 }
 
 function canReact(reactor, c) {
@@ -1124,40 +1309,49 @@ async function reactorTurn(reactor) {
   });
 
   if (v === 'back') return 'none';
+  return doReaction(reactor, v === 'rosie' || v === 'lou'
+    ? { type: v }
+    : { type: 'card', card: reactor.hand.find(c => c.instanceId === v) });
+}
 
-  if (v === 'rosie') {
+// Carry out a reaction (shared by humans and bots)
+async function doReaction(reactor, choice) {
+  const w = G.currentWhoopsies;
+
+  if (choice.type === 'rosie') {
     reactor.useAbility();
     G.addLog(`🎲 ${reactor.name} (Reckless Rosie) tries to dodge it!`);
     const r = await roll(reactor, 'Reckless Rosie');
     if (r >= 4) {
       G.addLog(`💪 ${reactor.name} avoids the damage!`);
       SFX.good();
-      await info('Dodged it!', `${reactor.name} rolled ${r} and avoids the Whoopsies.`);
+      botSay(reactor, 'dodge');
+      await info('Dodged it!', `${reactor.name} rolled ${r} and avoids the Whoopsies.`, { auto: reactor.isBot ? 1700 : null });
       return 'avoided';
     }
-    await info('Uh-oh…', `${reactor.name} rolled ${r}. The Whoopsies still hits.`);
+    await info('Uh-oh…', `${reactor.name} rolled ${r}. The Whoopsies still hits.`, { auto: reactor.isBot ? 1700 : null });
     return 'none';
   }
 
-  if (v === 'lou') {
+  if (choice.type === 'lou') {
     reactor.useAbility();
     G.whoopsiesDeck.putOnBottom(w);
     const fresh = G.whoopsiesDeck.draw();
     G.currentWhoopsies = fresh;
     G.addLog(`🥊 ${reactor.name} (Grumpy Lou) shoves "${w.name}" to the bottom. New card: "${fresh.name}"!`, 'whoops');
+    toast(`🥊 ${reactor.name} uses Grumpy Lou!`, reactor.character);
     renderAll();
     await revealWhoopsies(fresh, G.whoopsiesTarget);
     return 'none';
   }
 
-  const card = reactor.hand.find(c => c.instanceId === v);
-  return playAction(reactor, card);
+  return playAction(reactor, choice.card);
 }
 
 async function caseyCheck(p) {
   if (G.winner || p.isEliminated) return;
   if (p.character.id !== 'c_casey' || !p.canUseAbility() || p.id !== G.currentPlayerIdx) return;
-  const yes = await yesNo('Cautious Casey', `${p.name}, draw 1 Action card? (${p.abilitiesLeft} uses left)`,
+  const yes = p.isBot || await yesNo('Cautious Casey', `${p.name}, draw 1 Action card? (${p.abilitiesLeft} uses left)`,
                           'Draw!', 'Save it', { cards: [{ card: p.character }] });
   if (!yes) return;
   p.useAbility();
@@ -1231,9 +1425,13 @@ const RESOLVERS = {
       await hurt(t);
       return;
     }
-    const s = await pickPlayer(`Will anyone save ${t.name}?`,
-      'A player who discards an Action card saves them, and you both draw 1 card.',
-      savers, { kicker: '👟 Shoelaces near a cliff', cancel: 'Nobody, sorry!' });
+    let s = savers.find(o => o.isBot && Bot.wantsToSave(o)) ?? null;
+    const humanSavers = savers.filter(o => !o.isBot);
+    if (!s && humanSavers.length) {
+      s = await pickPlayer(`Will anyone save ${t.name}?`,
+        'A player who discards an Action card saves them, and you both draw 1 card.',
+        humanSavers, { kicker: '👟 Shoelaces near a cliff', cancel: 'Nobody, sorry!' });
+    }
     if (!s) { await hurt(t); return; }
     await passTo(s, `Pick an Action card to discard to save ${t.name}.`);
     const card = await pickFromHand(s, `Save ${t.name}`, 'Pick a card to discard.', { cancel: 'Changed my mind' });
@@ -1248,25 +1446,26 @@ const RESOLVERS = {
     await info('Saved!', `${s.name} grabbed ${t.name} just in time. You both draw a card.`);
   },
 
+  // "When this card enters play" you may pass it on — once.
+  // Whoever is handed the bear takes the hug (loses 1 life).
   async w_bear(t) {
-    for (;;) {
-      const others = G.activePlayers.filter(o => o.id !== t.id);
-      const v = await ask({
-        kicker: '🐻 Tried to hug a bear', title: `${t.name}, pass the bear?`,
-        body: 'Choose another player to take this Whoopsies card, or keep it and lose 1 life.',
-        players: others,
-        buttons: [{ label: '💔 Keep it, lose 1 life', cls: 'btn-red', value: 'keep' }],
-        wide: others.length > 3,
-      });
-      if (v === 'keep') { await hurt(t); return; }
-      await redirectTo(v, `${t.name} handed you the bear hug`);
-      t = G.whoopsiesTarget;
-    }
+    const others = G.activePlayers.filter(o => o.id !== t.id);
+    const v = t.isBot ? Bot.pickPlayer(t, others).id : await ask({
+      kicker: '🐻 Tried to hug a bear', title: `${t.name}, pass the bear?`,
+      body: 'Choose another player to take this Whoopsies card, or keep it and lose 1 life.',
+      players: others,
+      buttons: [{ label: '💔 Keep it, lose 1 life', cls: 'btn-red', value: 'keep' }],
+      wide: others.length > 3,
+    });
+    if (v === 'keep') { await hurt(t); return; }
+    botSay(t, 'redirect');
+    await redirectTo(v, `${t.name} handed you the bear hug`);
+    await hurt(G.whoopsiesTarget);
   },
 
   async w_leftovers(t) {
     await passTo(t, 'Choose how to handle the mystery leftovers.');
-    const choice = await ask({
+    const choice = t.isBot ? Bot.leftoversChoice(t) : await ask({
       kicker: '🍲 Ate mystery leftovers', title: `${t.name}, choose one`,
       buttons: [
         { label: '💔 Lose 1 life', cls: 'btn-red', value: 'life' },
@@ -1315,7 +1514,9 @@ const RESOLVERS = {
       }
       const leftIdx = G.playerToLeft(t.id), rightIdx = G.playerToRight(t.id);
       let to = leftIdx;
-      if (leftIdx !== rightIdx) {
+      if (leftIdx !== rightIdx && t.isBot) {
+        to = Bot.leader([G.players[leftIdx], G.players[rightIdx]]).id;
+      } else if (leftIdx !== rightIdx) {
         to = await ask({
           kicker: '🎰 Out of Luck!!', title: `${t.name} rolled ${r}! Pass it on`,
           body: 'Pass this card left or right. They must roll for it immediately.',

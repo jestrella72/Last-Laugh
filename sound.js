@@ -62,8 +62,17 @@ class SoundManager {
     this.#music  = this.#ctx.createGain();
     this.#music.gain.value = 0.16;
     this.#music.connect(this.#master);
+    // Decode FAHHH into Web Audio too: iPhones only let <audio> play
+    // straight from a tap, but an unlocked AudioContext can play any time.
+    fetch('sounds/fahhh.mp3')
+      .then(r => r.arrayBuffer())
+      .then(b => this.#ctx.decodeAudioData(b))
+      .then(buf => { this.#fahhhBuf = buf; })
+      .catch(() => {});
     if (this.musicOn) this.startMusic();
   }
+
+  #fahhhBuf = null;
 
   // ── Music ───────────────────────────────────────────────
   startMusic() {
@@ -216,6 +225,13 @@ class SoundManager {
       g.cancelScheduledValues(t);
       g.setTargetAtTime(0.03, t, 0.05);
       g.setTargetAtTime(0.16, t + 1.6, 0.3);
+    }
+    if (this.#fahhhBuf) {
+      const src = this.#ctx.createBufferSource();
+      src.buffer = this.#fahhhBuf;
+      src.connect(this.#master);
+      src.start();
+      return;
     }
     try {
       this.#fahhh.currentTime = 0;

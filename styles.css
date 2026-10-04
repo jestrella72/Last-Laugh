@@ -704,3 +704,18 @@ img { display: block; max-width: 100%; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition: none !important; }
 }
+
+/* ── Bots + setup extras ─────────────────────────────────── */
+.solo-row { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-top: 18px; }
+.solo-row .sub { margin: 0; }
+.seat-toggle { display: flex; gap: 10px; margin-bottom: 14px; }
+
+/* ── Phones ──────────────────────────────────────────────── */
+body { padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
+input, select { font-size: 16px !important; }   /* stops iPhone zooming into inputs */
+.overlay { padding: max(16px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom)); }
+@media (max-width: 560px) {
+  .hero { gap: 4px; margin-bottom: 16px; }
+  .hero-fan { transform: scale(.68); height: 160px; margin: -24px 0 -10px; }
+  .logo { font-size: 3rem; }
+}
