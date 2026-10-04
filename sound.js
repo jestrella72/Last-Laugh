@@ -14,7 +14,11 @@ class SoundManager {
   #timer  = null;
   #nextNoteTime = 0;
   #step   = 0;      // eighth-note counter
-  #fahhh  = new Audio('sounds/fahhh.mp3');
+
+  // Recorded sound clips. Each is decoded into Web Audio once sound is
+  // unlocked (so it plays on iPhones any time), with <audio> as a fallback.
+  static CLIPS = { fahhh: 'sounds/fahhh.mp3', nope: 'sounds/nope.mp3', wow: 'sounds/wow.mp3' };
+  #clips = {};   // name → { el: <audio>, buf: AudioBuffer | null }
 
   static BPM = 168;
 
@@ -40,7 +44,11 @@ class SoundManager {
   constructor() {
     this.musicOn = this.#load('ll-music', true);
     this.sfxOn   = this.#load('ll-sfx', true);
-    this.#fahhh.preload = 'auto';
+    for (const [name, url] of Object.entries(SoundManager.CLIPS)) {
+      const el = new Audio(url);
+      el.preload = 'auto';
+      this.#clips[name] = { el, buf: null };
+    }
 
     // Phones: pause audio while the game is in the background and wake
     // it up again when you come back (iOS can leave it stuck silent).
@@ -76,21 +84,21 @@ class SoundManager {
     this.#music  = this.#ctx.createGain();
     this.#music.gain.value = 0.16;
     this.#music.connect(this.#master);
-    // Decode FAHHH into Web Audio too: iPhones only let <audio> play
+    // Decode the clips into Web Audio: iPhones only let <audio> play
     // straight from a tap, but an unlocked AudioContext can play any time.
-    fetch('sounds/fahhh.mp3')
-      .then(r => r.arrayBuffer())
-      .then(b => this.#ctx.decodeAudioData(b))
-      .then(buf => { this.#fahhhBuf = buf; })
-      .catch(() => {});
+    for (const [name, url] of Object.entries(SoundManager.CLIPS)) {
+      fetch(url)
+        .then(r => r.arrayBuffer())
+        .then(b => this.#ctx.decodeAudioData(b))
+        .then(buf => { this.#clips[name].buf = buf; })
+        .catch(() => {});
+    }
     if (this.musicOn) this.startMusic();
   }
 
-  #fahhhBuf = null;
-
   // Handy for checking audio on a phone: SFX.audioState in the console
   get audioState() { return this.#ctx?.state ?? 'locked (tap the screen)'; }
-  get fahhhReady() { return !!this.#fahhhBuf; }
+  get fahhhReady() { return !!this.#clips.fahhh.buf; }
 
   // ── Music ───────────────────────────────────────────────
   startMusic() {
@@ -238,29 +246,33 @@ class SoundManager {
     [60, 64, 67, 72, 67, 72, 76, 79, 84].forEach((n, i) => this.#piano(n, t + i * 0.11, 0.3, 0.35, this.#master));
   }
 
-  // The "FAHHH" — life lost or a Whoopsies redirected at you.
-  // Music dips while it plays so it really lands.
-  fahhh() {
+  // Play a recorded clip. The music dips while it plays so it really lands.
+  #playClip(name, duckSeconds) {
     if (!this.sfxOn || this.quiet) return;
+    const clip = this.#clips[name];
     if (this.#music) {
       const g = this.#music.gain, t = this.#ctx.currentTime;
       g.cancelScheduledValues(t);
       g.setTargetAtTime(0.03, t, 0.05);
-      g.setTargetAtTime(0.16, t + 1.6, 0.3);
+      g.setTargetAtTime(0.16, t + duckSeconds, 0.3);
     }
-    if (this.#fahhhBuf) {
+    if (clip.buf && this.#ctx) {
       const src = this.#ctx.createBufferSource();
-      src.buffer = this.#fahhhBuf;
+      src.buffer = clip.buf;
       src.connect(this.#master);
       src.start();
       return;
     }
     try {
-      this.#fahhh.currentTime = 0;
-      const p = this.#fahhh.play();
+      clip.el.currentTime = 0;
+      const p = clip.el.play();
       if (p) p.catch(() => {});
     } catch {}
   }
+
+  fahhh() { this.#playClip('fahhh', 1.6); }   // life lost / Whoopsies sent to you
+  nope()  { this.#playClip('nope', 0.9); }    // someone played Cancel
+  wow()   { this.#playClip('wow', 1.4); }     // someone gained a life
 }
 
 const SFX = new SoundManager();

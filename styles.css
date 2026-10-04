@@ -783,3 +783,19 @@ input, select { font-size: 16px !important; }   /* stops iPhone zooming into inp
 .turn-table-cards { display: flex; gap: 8px; }
 .turn-table-cards .card { --w: 92px; }
 @media (max-width: 560px) { .turn-table-cards .card { --w: 70px; } }
+
+/* NOPE! (Cancel) and WOW! (life gained) pop-ups */
+#pop-screen { z-index: 128; cursor: pointer; }
+#pop-screen.pop-nope { background: rgba(200, 30, 40, .82); }
+#pop-screen.pop-wow  { background: radial-gradient(circle, rgba(255, 150, 200, .9), rgba(139, 92, 246, .88)); }
+.pop-inner { text-align: center; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+#pop-emoji { font-size: 7rem; line-height: 1; filter: drop-shadow(5px 5px 0 rgba(0,0,0,.45)); animation: popIn .5s cubic-bezier(.2,1.7,.4,1) both; }
+#pop-title {
+  font-family: var(--display); font-size: clamp(3rem, 15vw, 6rem); line-height: 1;
+  color: #fff; -webkit-text-stroke: 3px var(--ink); paint-order: stroke fill; text-shadow: 6px 6px 0 var(--ink);
+  animation: wobble .6s ease-out both;
+}
+#pop-sub { color: #fff; font-weight: 800; font-size: 1.2rem; max-width: 520px; text-shadow: 2px 2px 0 rgba(0,0,0,.4); }
+.pop-nope #pop-emoji { animation: popIn .5s cubic-bezier(.2,1.7,.4,1) both, nopeShake .45s .5s ease-in-out 2; }
+@keyframes popIn { from { transform: scale(0) rotate(-30deg); } }
+@keyframes nopeShake { 25% { transform: rotate(-12deg); } 75% { transform: rotate(12deg); } }

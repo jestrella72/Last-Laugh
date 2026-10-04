@@ -445,6 +445,26 @@ async function hurt(player, opts = {}) {
   return true;
 }
 
+// Quick full-screen moment: 'nope' (a Cancel) or 'wow' (a life gained).
+// Shows on every screen, with its sound, and closes by itself.
+function popOverlay(kind, title, sub, ms = 1900) {
+  if (NET.isHost) NET.broadcast({ t: 'pop', kind, title, sub });
+  if (kind === 'nope') SFX.nope();
+  if (kind === 'wow') SFX.wow();
+  return new Promise(resolve => {
+    const s = $('pop-screen');
+    s.className = `overlay pop-${kind}`;
+    $('pop-emoji').textContent = kind === 'nope' ? '🙅' : '💖';
+    $('pop-title').textContent = title;
+    $('pop-sub').textContent   = sub;
+    restartAnimations(s);
+    s.classList.add('open');
+    const close = () => { s.classList.remove('open'); clearTimeout(timer); resolve(); };
+    const timer = setTimeout(close, ms);
+    s.onclick = close;
+  });
+}
+
 function hurtOverlay(title, sub, ms) {
   return new Promise(resolve => {
     $('hurt-title').textContent = title;
@@ -1232,9 +1252,8 @@ async function cancelWindow(player, card) {
   canceller.removeFromHand(cancelCard.instanceId);
   G.actionDeck.discard(cancelCard);
   G.addLog(`✋ ${canceller.name} plays Cancel on ${player.name}'s ${card.name}!`);
-  SFX.play();
-  toast(`${canceller.name} cancels ${card.name}!`, cancelCard);
   renderAll();
+  await popOverlay('nope', 'NOPE!', `${canceller.name} cancels ${player.name}'s ${card.name}!`);
   // If the Cancel itself gets cancelled, the original card goes through
   return !(await cancelWindow(canceller, cancelCard));
 }
@@ -1310,14 +1329,14 @@ const EFFECTS = {
     if (G.savingLife) {   // played right before losing a life: keep it
       G.savingLife = false;
       G.addLog(`💖 Second Chance! ${p.name} keeps their life.`);
-      SFX.good();
-      toast(`💖 ${p.name} keeps their life!`);
+      renderAll();
+      await popOverlay('wow', 'WOW! Second Chance!', `${p.name} keeps their life!`);
       return 'saved';
     }
     p.gainLife();
     G.addLog(`💖 ${p.name} gains 1 life (${p.lives}).`);
-    SFX.good();
-    toast(`💖 ${p.name} gains a life!`);
+    renderAll();
+    await popOverlay('wow', 'WOW! +1 life', `${p.name} gains a life with Second Chance!`);
   },
 
   async a_peek(p) {

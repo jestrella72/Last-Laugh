@@ -290,7 +290,7 @@ const NET = {
   wrapSounds() {
     if (this._wrapped) return;
     this._wrapped = true;
-    for (const name of ['flip', 'play', 'dice', 'coin', 'good', 'fanfare', 'fahhh']) {
+    for (const name of ['flip', 'play', 'dice', 'coin', 'good', 'fanfare', 'fahhh', 'nope', 'wow']) {
       const orig = SFX[name].bind(SFX);
       SFX[name] = (...a) => {
         orig(...a);
@@ -521,6 +521,9 @@ const NET = {
         break;
       case 'hurt':
         hurtOverlay(msg.title, msg.sub, 2600);
+        break;
+      case 'pop':   // its sound arrives separately as an 'sfx' message
+        quietly(() => popOverlay(msg.kind, msg.title, msg.sub));
         break;
       case 'dice':
         if (!this.askOpenId) quietly(() => diceAnimation(msg.value, msg.caption, 1900));

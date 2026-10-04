@@ -86,6 +86,8 @@ Card counts are set in `cards.js`. Change the `copies` number to rebalance.
 
 - **Redirect alert:** when a Whoopsies is pushed onto you (Redirect, Slip Away, the bear, Out of Luck!!, Fester), a shocked face pops up: "This is being REDIRECTED to you!" with the FAHHH sound.
 - **Losing a life** plays FAHHH with a heart-break flash.
+- **NOPE!** Whenever someone plays Cancel, every screen shows a NOPE! pop-up with the "no" sound.
+- **WOW!** Whenever someone gains (or keeps) a life with Second Chance, every screen shows a WOW! pop-up with the wow sound.
 - **Table Talk:** a text box beside the table. Pick who's talking, type, or tap a quick line. Messages also pop up as speech bubbles over that player.
 - **Soundtrack:** a ragtime piano loop generated in the browser (no music file needed). 🎵 toggles music, 🔊 toggles sound effects.
 - Dice and coin animations, card flip reveals, and confetti for the winner.
@@ -102,7 +104,7 @@ Card counts are set in `cards.js`. Change the `copies` number to rebalance.
 | `app.js` | The UI controller: setup, turns, reactions, card effects, alerts |
 | `index.html` / `styles.css` | Page layout and the vintage cartoon look |
 | `images/cards/` | Final card art (WebP) |
-| `images/redirect-emoji.png`, `sounds/fahhh.mp3` | The redirect face and the FAHHH |
+| `images/redirect-emoji.png`, `sounds/*.mp3` | The redirect face and the FAHHH / NOPE / WOW sounds |
 
 ## 📚 OOP learning
 
