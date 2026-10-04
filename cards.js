@@ -145,7 +145,7 @@ const WHOOPSIES_CARDS = [
 ];
 
 const ACTION_CARDS = [
-  new ActionCard('a_not_today', 'Not Today!', IMG + 'a-not-today.webp', 5, TIMING.REACTION,
+  new ActionCard('a_not_today', 'Not Today!', IMG + 'a-not-today.webp', 5, TIMING.ANY_TIME,
     'Play after a Whoopsies card is revealed to prevent it from affecting you.'),
 
   new ActionCard('a_slip', 'Slip Away', IMG + 'a-slip-away.webp', 4, TIMING.ANY_TIME,

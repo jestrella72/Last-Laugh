@@ -33,11 +33,11 @@ Then open http://localhost:8090.
 - Lives: 3 each with 2–3 players, 2 with 4–5, 1 with 6–8.
 
 **On your turn**
-1. Draw 1 Action card.
-2. Play any **During Your Turn** cards or use your ability.
-3. Flip the top **Whoopsies** card. It's aimed at you.
-4. Before it resolves, anyone can react with **Play At Any Time** or **Reaction** cards and abilities: Redirect, Slip Away, Not Today!, Grumpy Lou, Reckless Rosie…
-5. Whoever it ends up aimed at resolves it. Then the next player to the left goes.
+1. Play any **During Your Turn** cards or use your ability.
+2. Flip the top **Whoopsies** card. It's aimed at you.
+3. Before it resolves, anyone can react with **Play At Any Time** or **Reaction** cards and abilities: Redirect, Slip Away, Not Today!, Grumpy Lou, Reckless Rosie… It's still your turn, so you can keep playing your turn cards too (Draw 2 before the shark checks your hand!).
+4. Whoever it ends up aimed at resolves it.
+5. Keep playing cards if you like, then **end your turn by drawing 1 Action card**. The next player to the left goes.
 
 **Timing tags** (same colours as the printed cards)
 | Tag | When |
@@ -48,13 +48,13 @@ Then open http://localhost:8090.
 
 **Tried to hug a bear** can be passed on once, when it's revealed. Whoever gets handed the bear loses the life.
 
-**Cancel** can stop any Action card (and a Cancel can be Cancelled). The game asks automatically whenever someone plays a card. **Drove wearing sunglasses at night** can only be stopped by Slip Away or Redirect.
+**Cancel** can stop any Action card, and Cancels stack (Cancel the Cancel, and so on). **Redirects stack** too: whoever a Whoopsies is redirected to can Redirect it again. **Not Today!** can be played at any time, even right before a Whoopsies takes your life. The game asks automatically whenever someone plays a card. **Drove wearing sunglasses at night** can only be stopped by Slip Away or Redirect.
 
 ## 🃏 The cards
 
 **Whoopsies (37):** Forgot to tie shoelaces near a cliff ×5, Tried to pet a shark ×5, Took a bath with a toaster ×5, Tried to hug a bear ×5, Danced on wet tiles ×5, Ate mystery leftovers ×2, Texting while driving ×2, Drove wearing sunglasses at night ×3, Out of Luck!! ×3, Miraculous Escape! ×2
 
-**Action (43):** Not Today! ×5, Slip Away ×4, Redirect ×4, Second Chance ×4, Cancel ×4, Peek Ahead ×4, Safety First ×2, Take 1 ×5, Swap Hands ×2, Skip Your Turn ×2, Draw 2 ×4, Double Trouble ×2, Recover ×1
+**Action (43):** Not Today! ×5 (Play At Any Time), Slip Away ×4, Redirect ×4, Second Chance ×4, Cancel ×4, Peek Ahead ×4, Safety First ×2, Take 1 ×5, Swap Hands ×2, Skip Your Turn ×2, Draw 2 ×4, Double Trouble ×2, Recover ×1
 
 **Characters (12):** Curious Carl, Cautious Casey, Prankster Pete, Bold Bella, Lucky Luke, Naive Nina, Reckless Rosie, Melo Mel, Franky Ice, Grumpy Lou, Slick Rick, Fester the Cat
 

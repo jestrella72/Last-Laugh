@@ -16,10 +16,6 @@ class Bot {
     a_peek: 4, a_skip: 3, a_draw2: 3, a_recover: 2,
   };
 
-  // Remembers which reactions each bot already tried on the current
-  // Whoopsies so two bots can't bounce a card back and forth forever.
-  static tried = new Set();
-
   static value(card)   { return Bot.VALUE[card.id] ?? 1; }
   static lowest(cards)  { return [...cards].sort((a, b) => Bot.value(a) - Bot.value(b))[0] ?? null; }
   static highest(cards) { return [...cards].sort((a, b) => Bot.value(b) - Bot.value(a))[0] ?? null; }
@@ -108,9 +104,6 @@ class Bot {
   // Returns { type: 'card', card } | { type: 'rosie' } | { type: 'lou' } | null
   static reaction(bot) {
     const w = G.currentWhoopsies;
-    const key = `${bot.id}:${G.whoopsiesTargetIdx}:${w.instanceId}`;
-    if (Bot.tried.has(key)) return null;
-
     const isTarget = bot.id === G.whoopsiesTargetIdx;
     const playable = bot.hand.filter(c => canReact(bot, c).ok);
     const has = id => playable.find(c => c.id === id);
@@ -126,7 +119,6 @@ class Bot {
     if (!choice && has('a_second_chance') && bot.lives < bot.maxLives) {
       choice = { type: 'card', card: has('a_second_chance') };
     }
-    if (choice) Bot.tried.add(key);
     return choice;
   }
 

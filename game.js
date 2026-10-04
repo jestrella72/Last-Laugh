@@ -193,6 +193,7 @@ class Game {
     this.turn             = 1;
     this.winner           = null;
     this.actionsThisTurn  = 0;     // counts Action cards for Franky Ice
+    this.flippedThisTurn  = false; // one Whoopsies flip per turn
 
     // The Whoopsies card currently being faced (null between turns)
     this.currentWhoopsies = null;
@@ -287,6 +288,7 @@ class Game {
   advanceTurn() {
     this.currentWhoopsies = null;
     this.actionsThisTurn  = 0;
+    this.flippedThisTurn  = false;
     this.turn++;
 
     let next;

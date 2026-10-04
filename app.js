@@ -332,6 +332,15 @@ async function redirectTo(idx, why) {
 // Every life loss goes through here: rules check, FAHHH, animation,
 // and the win check.
 async function hurt(player, opts = {}) {
+  // Not Today! can be played at any time — even right before the life is lost
+  if (G.currentWhoopsies && !opts.unstoppable && !G.safetyActive && !player.isEliminated) {
+    const nt = player.hand.find(c => c.id === 'a_not_today');
+    if (nt && canReact(player, nt).ok) {
+      const use = player.isBot || await yesNo('Not Today!?', `${player.name}, play Not Today! to stop losing this life?`,
+                                              'Not today! 🛑', 'Take the hit', { kicker: 'Last chance', cards: [{ card: nt }] });
+      if (use && (await playAction(player, nt)) === 'negated') return false;
+    }
+  }
   const lost = G.damage(player, opts);
   renderAll();
   if (!lost) {
@@ -732,16 +741,10 @@ async function startTurn() {
   busy = true;
   if (!p.isBot) setChatSpeaker(p);
   G.addLog(`— Turn ${G.turn}: ${p.name} —`, 'turn');
-  await passTo(p, 'Draw 1 Action card, play cards if you like, then flip a Whoopsies!',
+  await passTo(p, 'Play cards, flip a Whoopsies, keep playing if you like, then end your turn and draw 1.',
                { force: true, kicker: 'It\'s your turn', button: `I'm ${p.name}, show my cards` });
   p.frozenThisTurn = p.frozen;
   p.frozen = false;
-  const drawn = G.actionDeck.draw();
-  if (drawn) {
-    p.hand.push(drawn);
-    G.addLog(`${p.name} draws an Action card.`);
-    SFX.flip();
-  }
   if (p.isBot) {
     renderAll();
     try { await runBotTurn(p); }
@@ -751,7 +754,6 @@ async function startTurn() {
   }
   busy = false;
   renderAll();
-  renderHand(drawn?.instanceId);
 }
 
 // A bot's whole turn: play a few cards, maybe use its ability, flip.
@@ -774,7 +776,17 @@ async function runBotTurn(p) {
     renderAll();
     await sleep(800);
   }
+  G.flippedThisTurn = true;
   await faceWhoopsies(G.whoopsiesDeck.draw(), p.id);
+  if (!p.isEliminated && !G.winner) {
+    await sleep(700);
+    const card = Bot.chooseTurnCard(p);
+    if (card && ['a_second_chance', 'a_draw2', 'a_take1'].includes(card.id)) {
+      const res = await playAction(p, card);
+      renderAll();
+      if (res !== 'end_turn') await sleep(700);
+    }
+  }
   return endTurn();
 }
 
@@ -794,14 +806,17 @@ function renderMain() {
     return;
   }
 
-  let sub = 'Play any cards you want, then flip a Whoopsies. Tap a card to read it.';
+  let sub = G.flippedThisTurn
+    ? 'Keep playing cards if you like, then end your turn (you draw 1 Action card).'
+    : 'Play any cards you want, then flip a Whoopsies. Tap a card to read it.';
   if (p.frozenThisTurn) sub = `❄️ Franky Ice froze you: only 1 Action card this turn${G.actionsThisTurn ? ' (used)' : ''}. ` + sub;
   $('panel-sub').textContent = sub;
 
   const btns = $('panel-buttons');
   btns.innerHTML = '';
   if (viewerIdx === p.id) {
-    btns.appendChild(btnEl('⚠️ Flip a Whoopsies!', 'btn-red btn-big', onFlip));
+    if (G.flippedThisTurn) btns.appendChild(btnEl('✋ End turn (draw 1)', 'btn-green btn-big', onEndTurn));
+    else btns.appendChild(btnEl('⚠️ Flip a Whoopsies!', 'btn-red btn-big', onFlip));
     const a = p.character;
     if (a.timing === TIMING.YOUR_TURN && a.id !== 'c_casey') {
       const check = canUseTurnAbility(p);
@@ -841,13 +856,28 @@ async function runFlow(fn) {
 function onFlip() {
   runFlow(async () => {
     const p = G.currentPlayer;
+    G.flippedThisTurn = true;
     await faceWhoopsies(G.whoopsiesDeck.draw(), p.id);
-    return endTurn();
+    if (p.isEliminated) return endTurn();   // knocked out on your own turn
   });
 }
 
+function onEndTurn() {
+  runFlow(async () => endTurn());
+}
+
+// Ending a turn always draws 1 Action card, then play moves on.
 function endTurn() {
   if (G.winner) return 'ended';
+  const p = G.currentPlayer;
+  if (!p.isEliminated) {
+    const c = G.actionDeck.draw();
+    if (c) {
+      p.hand.push(c);
+      G.addLog(`${p.name} draws 1 Action card and ends their turn.`);
+      SFX.flip();
+    }
+  }
   const before = G.extraTurns.length;
   const skipped = G.advanceTurn();
   const extra = before > G.extraTurns.length;
@@ -1200,7 +1230,6 @@ const ABILITIES = {
 async function faceWhoopsies(card, targetIdx, { revealed = false } = {}) {
   G.currentWhoopsies   = card;
   G.whoopsiesTargetIdx = targetIdx;
-  Bot.tried.clear();
   G.addLog(`⚠️ Whoopsies! ${G.whoopsiesTarget.name} faces "${card.name}".`, 'whoops');
   renderAll();
   if (!revealed) await revealWhoopsies(card, G.whoopsiesTarget);
@@ -1269,6 +1298,12 @@ function canReact(reactor, c) {
   const isTarget = reactor.id === G.whoopsiesTargetIdx;
   if (reactor.id === G.currentPlayerIdx && reactor.frozenThisTurn && G.actionsThisTurn >= 1) {
     return { ok: false, reason: '❄️ Frozen' };
+  }
+  // It's still your turn while your Whoopsies is out, so turn cards work too
+  if (c.timing === TIMING.YOUR_TURN) {
+    if (reactor.id !== G.currentPlayerIdx) return { ok: false, reason: 'Your turn only' };
+    const ok = canPlayOnTurn(reactor, c);
+    return ok.ok ? ok : { ok: false, reason: '' };
   }
   switch (c.id) {
     case 'a_not_today':
@@ -1571,15 +1606,17 @@ function showRules() {
       </ul>
       <h4>On your turn</h4>
       <ol>
-        <li>Draw 1 Action card.</li>
         <li>Play any <span class="tag tag-your_turn">During Your Turn</span> cards or use your ability, if you want.</li>
         <li>Flip the top <b>Whoopsies</b> card. It's aimed at you.</li>
-        <li>Before it resolves, anyone can react with <span class="tag tag-any_time">Play At Any Time</span> or <span class="tag tag-reaction">Reaction</span> cards and abilities. Redirect it, slip away, say Not Today!…</li>
-        <li>Whoever it ends up aimed at resolves it. Then the next player to the left goes.</li>
+        <li>Before it resolves, anyone can react with <span class="tag tag-any_time">Play At Any Time</span> or <span class="tag tag-reaction">Reaction</span> cards and abilities. It's still your turn, so you can keep playing your turn cards too.</li>
+        <li>Whoever it ends up aimed at resolves it.</li>
+        <li>Keep playing cards if you like, then <b>end your turn by drawing 1 Action card</b>. The next player to the left goes.</li>
       </ol>
       <h4>Good to know</h4>
       <ul>
-        <li><b>Cancel</b> can stop any Action card. The game asks automatically when someone plays one.</li>
+        <li><b>Cancel</b> can stop any Action card, and Cancels stack: Cancel the Cancel, and so on. The game asks automatically.</li>
+        <li><b>Redirects stack:</b> whoever a Whoopsies gets redirected to can Redirect it again.</li>
+        <li><b>Not Today!</b> can be played at any time, even right before a Whoopsies takes your life.</li>
         <li><b>Drove wearing sunglasses at night</b> can only be stopped by Slip Away or Redirect.</li>
         <li>Lose all your lives and you're out. Use the 💬 Table Talk box to taunt your friends.</li>
         <li>Pass-and-play: when the game says "pass the device", hand it over and don't peek!</li>
