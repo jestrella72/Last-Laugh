@@ -72,7 +72,6 @@ function chipEl(p, { flags = true } = {}) {
     if (p.skipNextTurn) f.push('<span title="Next turn skipped">⏭️</span>');
     if (p.frozen || (p.frozenThisTurn && G.currentPlayerIdx === p.id)) f.push('<span title="Franky Ice: 1 Action card only">❄️</span>');
     if (G.extraTurns.includes(p.id)) f.push('<span title="Extra turn coming">➕</span>');
-    if (p.whoopsiesReceived) f.push(`<span title="Whoopsies sent to them by others this round (max ${Game.MAX_RECEIVED})">⚠️${p.whoopsiesReceived}/${Game.MAX_RECEIVED}</span>`);
   }
   d.innerHTML = `
     <div class="chip-flags">${f.join('')}</div>
@@ -81,7 +80,9 @@ function chipEl(p, { flags = true } = {}) {
     <div class="chip-char">${esc(p.character.name)}</div>
     <div class="hearts">${p.isEliminated ? '💀 Out' : heartsHTML(p)}</div>
     <div class="aces" title="Ability uses left">${acesHTML(p)}</div>
-    <div class="chip-meta">🃏 ${p.hand.length}</div>`;
+    <div class="chip-meta">🃏 ${p.hand.length}</div>
+    ${(p.table || []).length ? `<div class="chip-table" title="Whoopsies waiting on ${esc(p.name)}'s table">${
+      p.table.map(e => `<img src="${e.card.image}" alt="${esc(e.card.name)}">`).join('')}</div>` : ''}`;
   return d;
 }
 
@@ -358,7 +359,7 @@ function redirectAlert(toPlayer, why, card = G.currentWhoopsies) {
   return new Promise(resolve => {
     $('redirect-name').textContent = `${toPlayer.name}!`;
     $('redirect-card-img').src     = card.image;
-    $('redirect-from').textContent = why;
+    $('redirect-from').textContent = `${why}. It waits on your table until your turn.`;
     const s = $('redirect-screen');
     restartAnimations(s);
     s.classList.add('open');
@@ -371,13 +372,15 @@ function redirectAlert(toPlayer, why, card = G.currentWhoopsies) {
   });
 }
 
-async function redirectTo(idx, why) {
-  G.whoopsiesTargetIdx = idx;
-  const p = G.players[idx];
-  p.whoopsiesReceived++;
-  G.addLog(`👉 "${G.currentWhoopsies.name}" is redirected to ${p.name}! (${why})`, 'redirect');
+// Sending a Whoopsies to someone puts it on THEIR table: they face it
+// on their own turn. For the player who sent it, it's over.
+async function redirectTo(idx, why, { passedBear = false } = {}) {
+  const p = G.players[idx], card = G.currentWhoopsies;
+  p.table.push({ card, why, passedBear });
+  G.sentAway = true;
+  G.addLog(`👉 "${card.name}" goes on ${p.name}'s table. They face it on their turn. (${why})`, 'redirect');
   renderAll();
-  await redirectAlert(p, why);
+  await redirectAlert(p, why, card);
 }
 
 // Every life loss goes through here: rules check, FAHHH, animation,
@@ -751,27 +754,56 @@ function renderTable() {
 function renderHand(newCardId = null) {
   const hand = $('hand');
   hand.innerHTML = '';
-  // Online the host always sees their own hand; locally, whoever's turn it is
-  const p = NET.isHost ? G.players[NET.localIdx] : G.currentPlayer;
-  const myTurn = p.id === G.currentPlayerIdx;
-  if (!NET.isHost && viewerIdx !== p.id) {
-    const viewer = viewerIdx === null ? null : G.players[viewerIdx];
+  // You always see your own hand: online that's the host's seat,
+  // locally it's whoever is holding the device (even on someone else's turn)
+  const p = NET.isHost ? G.players[NET.localIdx] : viewerIdx !== null ? G.players[viewerIdx] : null;
+  renderMyTable(p);
+  if (!p) {
     hand.innerHTML = `<div class="hand-hidden">${cardEl({ name: 'Hidden hand', image: CARD_BACKS.action }).outerHTML}
-      <span>${viewer ? `${esc(viewer.name)} has the device. ` : ''}${esc(p.name)}'s cards are hidden.</span></div>`;
+      <span>Cards are hidden until the device is passed.</span></div>`;
     return;
   }
+  const myTurn = p.id === G.currentPlayerIdx;
+  if (!myTurn) {
+    const note = document.createElement('div');
+    note.className = 'hand-note';
+    note.textContent = `${p.name}'s hand · reactions pop up when you can use them`;
+    hand.appendChild(note);
+  }
   if (!p.hand.length) {
-    hand.innerHTML = '<div class="hand-hidden"><span>No Action cards in your hand.</span></div>';
+    hand.insertAdjacentHTML('beforeend', '<div class="hand-hidden"><span>No Action cards in your hand.</span></div>');
     return;
   }
   for (const c of p.hand) {
     const check = busy || !myTurn ? { ok: false } : canPlayOnTurn(p, c);
-    const el = cardEl(c, { cls: (check.ok ? 'pickable' : 'dim') + (c.instanceId === newCardId ? ' new' : '') });
-    el.style.opacity = check.ok || busy ? '' : '.7';
+    // Off-turn cards look normal (tap to read); on your turn, unplayable ones are dimmed
+    const dim = myTurn && !check.ok && !busy;
+    const el = cardEl(c, { cls: (dim ? 'dim' : 'pickable') + (c.instanceId === newCardId ? ' new' : '') });
+    if (dim) el.style.opacity = '.7';
     el.tabIndex = 0;
     el.onclick = () => onHandCardClick(c);
     el.onkeydown = e => { if (e.key === 'Enter') onHandCardClick(c); };
     hand.appendChild(el);
+  }
+}
+
+// "Your table": the Whoopsies waiting for you, shown above your hand
+function renderMyTable(p) {
+  const box = $('my-table');
+  box.innerHTML = '';
+  if (!p || !p.table?.length) { box.style.display = 'none'; return; }
+  box.style.display = '';
+  const label = document.createElement('div');
+  label.className = 'my-table-label';
+  label.textContent = `⚠️ On your table (${p.table.length}/${Game.MAX_RECEIVED}) · you face ${p.table.length > 1 ? 'these' : 'this'} on your turn`;
+  box.appendChild(label);
+  for (const e of p.table) {
+    const el = cardEl(e.card, { cls: 'pickable' });
+    el.title = `${e.card.name} — ${e.why}`;
+    el.onclick = () => ask({ local: true, kicker: 'On your table', title: e.card.name, single: true,
+      cards: [{ card: e.card }], body: `${e.why}. You face it on your turn.`,
+      buttons: [{ label: 'Close', cls: 'btn-yellow', value: 0 }] });
+    box.appendChild(el);
   }
 }
 
@@ -862,7 +894,6 @@ async function startTurn() {
                { force: true, kicker: 'It\'s your turn', button: `I'm ${p.name}, show my cards` });
   p.frozenThisTurn = p.frozen;
   p.frozen = false;
-  p.whoopsiesReceived = 0;   // a new round of "sent to you" starts now
   if (p.isBot) {
     renderAll();
     try { await runBotTurn(p); }
@@ -877,8 +908,8 @@ async function startTurn() {
 // A bot's whole turn: play a few cards, maybe use its ability, flip.
 async function runBotTurn(p) {
   await sleep(900);
-  if (G.flippedThisTurn) return botFinishTurn(p);   // took over mid-turn
-  for (let i = 0; i < 2 && !G.winner; i++) {
+  const fresh = !G.flippedThisTurn && !G.actionsThisTurn;   // false if taking over mid-turn
+  for (let i = 0; i < 2 && fresh && !G.winner; i++) {
     const card = Bot.chooseTurnCard(p);
     if (!card) break;
     const res = await playAction(p, card);
@@ -886,7 +917,7 @@ async function runBotTurn(p) {
     if (res === 'end_turn') return endTurn();
     await sleep(800);
   }
-  if (Bot.wantsAbility(p)) {
+  if (fresh && Bot.wantsAbility(p)) {
     p.useAbility();
     G.addLog(`✨ ${p.name} uses ${p.character.name}.`);
     toast(`✨ ${p.name} uses ${p.character.name}!`, p.character);
@@ -895,8 +926,16 @@ async function runBotTurn(p) {
     renderAll();
     await sleep(800);
   }
-  G.flippedThisTurn = true;
-  await faceWhoopsies(G.whoopsiesDeck.draw(), p.id);
+  // First the Whoopsies waiting on its table, then its own flip
+  while (p.table.length && !p.isEliminated && !G.winner) {
+    const e = p.table.shift();
+    await faceWhoopsies(e.card, p.id, { passedBear: e.passedBear });
+    await sleep(500);
+  }
+  if (!G.flippedThisTurn && !p.isEliminated && !G.winner) {
+    G.flippedThisTurn = true;
+    await faceWhoopsies(G.whoopsiesDeck.draw(), p.id);
+  }
   return botFinishTurn(p);
 }
 
@@ -945,16 +984,19 @@ function renderMain() {
     return;
   }
 
-  let sub = G.flippedThisTurn
-    ? 'Keep playing cards if you like, then end your turn (you draw 1 Action card).'
-    : 'Play any cards you want, then flip a Whoopsies. Tap a card to read it.';
+  let sub = p.table.length
+    ? `You have ${p.table.length} Whoopsies waiting on your table. Face ${p.table.length > 1 ? 'them' : 'it'} first (you can play cards before), then flip your own.`
+    : G.flippedThisTurn
+      ? 'Keep playing cards if you like, then end your turn (you draw 1 Action card).'
+      : 'Play any cards you want, then flip a Whoopsies. Tap a card to read it.';
   if (p.frozenThisTurn) sub = `❄️ Franky Ice froze you: only 1 Action card this turn${G.actionsThisTurn ? ' (used)' : ''}. ` + sub;
   $('panel-sub').textContent = sub;
 
   const btns = $('panel-buttons');
   btns.innerHTML = '';
   if (NET.isHost ? p.id === NET.localIdx : viewerIdx === p.id) {
-    if (G.flippedThisTurn) btns.appendChild(btnEl('✋ End turn (draw 1)', 'btn-green btn-big', onEndTurn));
+    if (p.table.length) btns.appendChild(btnEl(`⚠️ Face a Whoopsies from your table (${p.table.length})`, 'btn-red btn-big', onFaceTable));
+    else if (G.flippedThisTurn) btns.appendChild(btnEl('✋ End turn (draw 1)', 'btn-green btn-big', onEndTurn));
     else btns.appendChild(btnEl('⚠️ Flip a Whoopsies!', 'btn-red btn-big', onFlip));
     const a = p.character;
     if (a.timing === TIMING.YOUR_TURN && a.id !== 'c_casey') {
@@ -998,6 +1040,17 @@ function onFlip() {
     G.flippedThisTurn = true;
     await faceWhoopsies(G.whoopsiesDeck.draw(), p.id);
     if (p.isEliminated) return endTurn();   // knocked out on your own turn
+  });
+}
+
+// Face the next Whoopsies someone sent to your table
+function onFaceTable() {
+  runFlow(async () => {
+    const p = G.currentPlayer;
+    const e = p.table.shift();
+    if (!e) return;
+    await faceWhoopsies(e.card, p.id, { passedBear: e.passedBear });
+    if (p.isEliminated) return endTurn();
   });
 }
 
@@ -1052,7 +1105,8 @@ function canPlayOnTurn(p, c) {
 
 async function onHandCardClick(card) {
   if (busy) return;
-  const p = NET.isHost ? G.players[NET.localIdx] : G.currentPlayer;
+  const p = NET.isHost ? G.players[NET.localIdx] : viewerIdx !== null ? G.players[viewerIdx] : null;
+  if (!p) return;
   const check = p.id === G.currentPlayerIdx ? canPlayOnTurn(p, card)
     : { ok: false, reason: 'Wait for your turn. When you can react, the game will ask you.' };
   const v = await ask({ local: true,
@@ -1365,10 +1419,9 @@ const ABILITIES = {
     const t = await pickPlayer('Fester the Cat 🐈‍⬛', 'Who gets the top Whoopsies card?', others, { who: p });
     G.addLog(`🐈‍⬛ ${p.name} (Fester) deals ${t.name} a Whoopsies card!`);
     const w = G.whoopsiesDeck.draw();
-    G.currentWhoopsies = w;
-    t.whoopsiesReceived++;
-    await redirectAlert(t, `${p.name}'s Fester the Cat dealt you a Whoopsies`);
-    await faceWhoopsies(w, t.id, { revealed: true });
+    t.table.push({ card: w, why: `${p.name}'s Fester the Cat dealt it` });
+    renderAll();
+    await redirectAlert(t, `${p.name}'s Fester the Cat dealt you a Whoopsies`, w);
   },
 };
 
@@ -1376,21 +1429,25 @@ const ABILITIES = {
 //  FACING A WHOOPSIES
 // =============================================================
 
-async function faceWhoopsies(card, targetIdx, { revealed = false } = {}) {
+async function faceWhoopsies(card, targetIdx, { revealed = false, passedBear = false } = {}) {
   G.currentWhoopsies   = card;
   G.whoopsiesTargetIdx = targetIdx;
+  G.sentAway           = false;        // set when it's sent to someone's table
+  G.currentPassedBear  = passedBear;   // a bear someone handed you can't be passed again
   G.addLog(`⚠️ Whoopsies! ${G.whoopsiesTarget.name} faces "${card.name}".`, 'whoops');
   renderAll();
   if (!revealed) await revealWhoopsies(card, G.whoopsiesTarget);
 
   const outcome = await reactionWindow();
-  if (outcome === 'resolve') await resolveWhoopsies();
+  if (outcome === 'resolve' && !G.sentAway) await resolveWhoopsies();
 
   const resolver = G.whoopsiesTarget;
-  G.whoopsiesDeck.discard(G.currentWhoopsies);
+  const sent = G.sentAway;
+  if (!sent) G.whoopsiesDeck.discard(G.currentWhoopsies);   // sent cards stay on a table
   G.currentWhoopsies = null;
+  G.currentPassedBear = false;
   renderAll();
-  await caseyCheck(resolver);
+  if (!sent) await caseyCheck(resolver);
 }
 
 // Before a Whoopsies resolves, anyone may react.
@@ -1408,6 +1465,7 @@ async function reactionWindow() {
       botReacted = true;
       await sleep(500);
       const r = await doReaction(b, choice);
+      if (G.sentAway) return 'sent';
       if (r === 'negated' || r === 'avoided') return r;
       break;
     }
@@ -1425,6 +1483,7 @@ async function reactionWindow() {
       }));
       if (!reactor) return 'resolve';
       const r = await reactorTurn(reactor);
+      if (G.sentAway) return 'sent';
       if (r === 'negated' || r === 'avoided') return r;
       continue;
     }
@@ -1444,6 +1503,7 @@ async function reactionWindow() {
     });
     if (v === 'resolve') return 'resolve';
     const r = await reactorTurn(G.players[v]);
+    if (G.sentAway) return 'sent';
     if (r === 'negated' || r === 'avoided') return r;
   }
 }
@@ -1655,11 +1715,16 @@ const RESOLVERS = {
   },
 
   // "When this card enters play" you may pass it on — once.
-  // Whoever is handed the bear takes the hug (loses 1 life).
+  // Whoever is handed the bear gets it on their table and takes the hug.
   async w_bear(t) {
+    if (G.currentPassedBear) {
+      await info('Tried to hug a bear 🐻', `Someone handed ${t.name} this bear. It can't be passed again!`);
+      await hurt(t);
+      return;
+    }
     const others = G.activePlayers.filter(o => o.id !== t.id && G.canReceive(o));
     if (!others.length) {
-      await info('Tried to hug a bear 🐻', `Everyone else has already faced 2 Whoopsies from other players this round. ${t.name} keeps the bear.`);
+      await info('Tried to hug a bear 🐻', `Everyone else's table is full. ${t.name} keeps the bear.`);
       await hurt(t);
       return;
     }
@@ -1672,8 +1737,7 @@ const RESOLVERS = {
     });
     if (v === 'keep' || v === undefined) { await hurt(t); return; }
     botSay(t, 'redirect');
-    await redirectTo(v, `${t.name} handed you the bear hug`);
-    await hurt(G.whoopsiesTarget);
+    await redirectTo(v, `${t.name} handed you the bear hug`, { passedBear: true });
   },
 
   async w_leftovers(t) {
@@ -1728,8 +1792,8 @@ const RESOLVERS = {
       const leftIdx = G.playerToLeft(t.id), rightIdx = G.playerToRight(t.id);
       const canL = G.canReceive(G.players[leftIdx]), canR = G.canReceive(G.players[rightIdx]);
       if (!canL && !canR) {
-        G.addLog(`🎰 ${t.name} rolled ${r}, but both neighbours already faced 2 Whoopsies this round.`);
-        await info('Nobody to pass it to', `${t.name} rolled ${r}, but both neighbours have already faced 2 Whoopsies from others this round. Nothing happens.`);
+        G.addLog(`🎰 ${t.name} rolled ${r}, but both neighbours' tables are full.`);
+        await info('Nobody to pass it to', `${t.name} rolled ${r}, but both neighbours' tables are full. Nothing happens.`);
         return;
       }
       let to = canL ? leftIdx : rightIdx;
@@ -1738,7 +1802,7 @@ const RESOLVERS = {
       } else if (canL && canR && leftIdx !== rightIdx) {
         to = await ask({ who: t,
           kicker: '🎰 Out of Luck!!', title: `${t.name} rolled ${r}! Pass it on`,
-          body: 'Pass this card left or right. They must roll for it immediately.',
+          body: 'Pass this card left or right. It goes on their table and they roll for it on their turn.',
           buttons: [
             { label: `👈 Right: ${G.players[rightIdx].name}`, cls: 'btn-yellow', value: rightIdx },
             { label: `Left: ${G.players[leftIdx].name} 👉`,  cls: 'btn-yellow', value: leftIdx },
@@ -1746,7 +1810,7 @@ const RESOLVERS = {
         });
       }
       await redirectTo(to, `${t.name} rolled ${r} on Out of Luck!!`);
-      t = G.whoopsiesTarget;
+      return;
     }
   },
 };
@@ -1801,7 +1865,7 @@ function showRules() {
         <li><b>Cancel</b> can stop any Action card, and Cancels stack: Cancel the Cancel, and so on. The game asks automatically.</li>
         <li><b>Redirects stack:</b> whoever a Whoopsies gets redirected to can Redirect it again.</li>
         <li><b>Only the player whose turn it is flips a Whoopsies.</b> Everyone else waits for their turn.</li>
-        <li><b>Max 2 sent to you:</b> between your turns, other players can send you at most 2 Whoopsies (Redirect, Slip Away, the bear, Out of Luck!!, Fester), on top of your own flip. The ⚠️ badge on a player shows how many they've had.</li>
+        <li><b>Everyone has a table.</b> A Whoopsies sent to you (Redirect, Slip Away, the bear, Out of Luck!!, Fester) lands face-up on your table and waits for <b>your turn</b>. On your turn you face those first, then flip your own. A table holds at most 2.</li>
         <li><b>Not Today!</b> can be played at any time, even right before a Whoopsies takes your life.</li>
         <li><b>Drove wearing sunglasses at night</b> can only be stopped by Slip Away or Redirect.</li>
         <li>Lose all your lives and you're out. Use the 💬 Table Talk box to taunt your friends.</li>

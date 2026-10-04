@@ -381,7 +381,8 @@ const NET = {
         id: o.id, name: o.name, isBot: o.isBot, away: !!o.netAway, charId: o.character.id,
         lives: o.lives, maxLives: o.maxLives, abilitiesLeft: o.abilitiesLeft, handCount: o.hand.length,
         isEliminated: o.isEliminated, skipNextTurn: o.skipNextTurn, frozen: o.frozen,
-        frozenThisTurn: o.frozenThisTurn, whoopsiesReceived: o.whoopsiesReceived,
+        frozenThisTurn: o.frozenThisTurn,
+        table: o.table.map(e => ({ card: packCard(e.card), why: e.why })),
       })),
       hand: p.hand.map(c => {
         const chk = myTurn && !busy ? canPlayOnTurn(p, c)
@@ -398,8 +399,9 @@ const NET = {
     const p = G.players[pid];
     if (p.isBot) return;
     switch (msg.a) {
-      case 'flip':    if (!G.flippedThisTurn) onFlip(); break;
-      case 'end':     if (G.flippedThisTurn) onEndTurn(); break;
+      case 'face':    if (p.table.length) onFaceTable(); break;
+      case 'flip':    if (!p.table.length && !G.flippedThisTurn) onFlip(); break;
+      case 'end':     if (!p.table.length && G.flippedThisTurn) onEndTurn(); break;
       case 'ability': onAbility(); break;
       case 'play': {
         const card = p.hand.find(c => c.instanceId === msg.iid);
@@ -549,16 +551,19 @@ const NET = {
 
     $('panel-title').textContent = me.isEliminated ? '💀 You\'re out' : myTurn ? '🎉 Your turn!' : cur.isBot ? `🤖 ${cur.name} is playing…` : `⏳ ${cur.name}'s turn`;
     $('panel-sub').textContent = me.isEliminated ? 'Stick around and watch who gets the Last Laugh.'
-      : myTurn ? (s.flipped ? 'Keep playing cards if you like, then end your turn (you draw 1 Action card).'
-                            : 'Play any cards you want, then flip a Whoopsies. Tap a card to read it.')
+      : myTurn ? (me.table.length ? `You have ${me.table.length} Whoopsies waiting on your table. Face ${me.table.length > 1 ? 'them' : 'it'} first, then flip your own.`
+                  : s.flipped ? 'Keep playing cards if you like, then end your turn (you draw 1 Action card).'
+                  : 'Play any cards you want, then flip a Whoopsies. Tap a card to read it.')
       : 'Your reaction cards pop up when you can use them. Tap a card to read it.';
 
     const btns = $('panel-buttons');
     btns.innerHTML = '';
     if (myTurn && !me.isEliminated) {
-      const main = s.flipped
-        ? btnEl('✋ End turn (draw 1)', 'btn-green btn-big', () => this.send({ t: 'act', a: 'end' }))
-        : btnEl('⚠️ Flip a Whoopsies!', 'btn-red btn-big', () => this.send({ t: 'act', a: 'flip' }));
+      const main = me.table.length
+        ? btnEl(`⚠️ Face a Whoopsies from your table (${me.table.length})`, 'btn-red btn-big', () => this.send({ t: 'act', a: 'face' }))
+        : s.flipped
+          ? btnEl('✋ End turn (draw 1)', 'btn-green btn-big', () => this.send({ t: 'act', a: 'end' }))
+          : btnEl('⚠️ Flip a Whoopsies!', 'btn-red btn-big', () => this.send({ t: 'act', a: 'flip' }));
       main.disabled = s.busy;
       btns.appendChild(main);
       if (s.ability) {
@@ -569,6 +574,7 @@ const NET = {
       }
     }
 
+    renderMyTable(me);
     const hand = $('hand');
     hand.innerHTML = '';
     if (!s.hand.length) {
@@ -576,8 +582,9 @@ const NET = {
       return;
     }
     for (const c of s.hand) {
-      const el = cardEl(c, { cls: c.ok ? 'pickable' : 'dim' });
-      el.style.opacity = c.ok ? '' : '.75';
+      const dim = myTurn && !c.ok && !s.busy;
+      const el = cardEl(c, { cls: dim ? 'dim' : 'pickable' });
+      if (dim) el.style.opacity = '.75';
       el.tabIndex = 0;
       const open = async () => {
         const v = await askLocal({

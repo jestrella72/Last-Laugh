@@ -60,9 +60,11 @@ Good to know:
 | 🟦 Play At Any Time | Whenever it makes sense |
 | 🟥 Reaction | In response to something (a Whoopsies, an Action card, a Take 1…) |
 
-**Only the player whose turn it is flips a Whoopsies.** Between your turns, other players can send you **at most 2 Whoopsies** (Redirect, Slip Away, the bear, Out of Luck!!, Fester) on top of your own flip. Grumpy Lou's swap only works on Lou's own turn.
+**You only face Whoopsies on your own turn.** Everyone has a **table**. A Whoopsies sent to you (Redirect, Slip Away, the bear, Out of Luck!!, Fester) lands face-up on your table and waits there. On your turn you face the ones on your table first (you can play cards before each), then flip your own. A table holds **at most 2**, so the most you face in a turn is 2 + your own flip. Only the player whose turn it is flips; Grumpy Lou's swap only works on Lou's own turn.
 
-**Tried to hug a bear** can be passed on once, when it's revealed. Whoever gets handed the bear loses the life.
+**Tried to hug a bear** can be passed on once, when it's flipped. Whoever gets handed the bear faces it on their turn and can't pass it again.
+
+**Out of Luck!!** on a 5–6 goes to the table of the player on your left or right, and they roll for it on their turn.
 
 **Cancel** can stop any Action card, and Cancels stack (Cancel the Cancel, and so on). **Redirects stack** too: whoever a Whoopsies is redirected to can Redirect it again. **Not Today!** can be played at any time, even right before a Whoopsies takes your life. The game asks automatically whenever someone plays a card. **Drove wearing sunglasses at night** can only be stopped by Slip Away or Redirect.
 

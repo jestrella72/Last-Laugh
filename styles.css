@@ -761,3 +761,18 @@ input, select { font-size: 16px !important; }   /* stops iPhone zooming into inp
 #net-banner.on { display: block; }
 .online-buttons { display: flex; gap: 12px; flex-wrap: wrap; }
 .online-buttons .btn { flex: 1 1 200px; }
+
+/* ── Player tables (Whoopsies waiting for your turn) ─────── */
+.chip-table {
+  display: flex; justify-content: center; gap: 3px; margin-top: 5px;
+  padding: 3px; border-top: 2px dashed rgba(27,26,23,.3);
+}
+.chip-table img { width: 26px; border-radius: 3px; box-shadow: 1px 1px 0 var(--ink); background: #fff; }
+#my-table {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  background: #fff3f3; border: 3px dashed var(--red); border-radius: 14px;
+  padding: 8px 12px; margin-bottom: 6px;
+}
+#my-table .card { --w: 64px; }
+.my-table-label { font-weight: 800; color: var(--red); flex: 1 1 100%; font-size: .85rem; }
+.hand-note { flex: none; align-self: center; font-weight: 800; font-size: .78rem; color: var(--ink-soft); writing-mode: vertical-rl; transform: rotate(180deg); }
