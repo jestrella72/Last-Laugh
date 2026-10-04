@@ -355,11 +355,12 @@ function revealWhoopsies(card, target) {
 // gets pushed onto someone else.
 // Only the player it's sent to gets the big alert + FAHHH;
 // everyone else just gets a small note.
-function redirectAlert(toPlayer, why, card = G.currentWhoopsies) {
+// sound: false when the FAHHH already played for everyone (Slip Away)
+function redirectAlert(toPlayer, why, card = G.currentWhoopsies, { sound = true } = {}) {
   let showHere = !toPlayer.isBot;   // local play: shared screen, skip it for bots
   if (NET.isHost) {
     if (toPlayer.id !== NET.localIdx && !toPlayer.isBot) {
-      NET.sendTo(toPlayer.id, { t: 'redirect', name: toPlayer.name, why, card: packCard(card) });
+      NET.sendTo(toPlayer.id, { t: 'redirect', name: toPlayer.name, why, card: packCard(card), sound });
     }
     showHere = toPlayer.id === NET.localIdx;
   }
@@ -368,9 +369,11 @@ function redirectAlert(toPlayer, why, card = G.currentWhoopsies) {
     toast(`👉 "${card.name}" goes on ${toPlayer.name}'s table`, card);
     return sleep(600);
   }
-  SFX.localOnly = true;
-  SFX.fahhh();
-  SFX.localOnly = false;
+  if (sound) {
+    SFX.localOnly = true;
+    SFX.fahhh();
+    SFX.localOnly = false;
+  }
   return new Promise(resolve => {
     $('redirect-name').textContent = `${toPlayer.name}!`;
     $('redirect-card-img').src     = card.image;
@@ -389,13 +392,13 @@ function redirectAlert(toPlayer, why, card = G.currentWhoopsies) {
 
 // Sending a Whoopsies to someone puts it on THEIR table: they face it
 // on their own turn. For the player who sent it, it's over.
-async function redirectTo(idx, why, { passedBear = G.currentPassedBear } = {}) {
+async function redirectTo(idx, why, { passedBear = G.currentPassedBear, sound = true } = {}) {
   const p = G.players[idx], card = G.currentWhoopsies;
   p.table.push({ card, why, passedBear });
   G.sentAway = true;
   G.addLog(`👉 "${card.name}" goes on ${p.name}'s table. They face it on their turn. (${why})`, 'redirect');
   renderAll();
-  await redirectAlert(p, why, card);
+  await redirectAlert(p, why, card, { sound });
 }
 
 // Every life loss goes through here: rules check, FAHHH, animation,
@@ -1397,7 +1400,8 @@ const EFFECTS = {
 
   async a_slip(p) {
     const left = G.playerToLeft(G.whoopsiesTargetIdx);
-    await redirectTo(left, `${p.name} played Slip Away (passed to the left)`);
+    SFX.fahhh();   // everyone hears it (online it's echoed to every phone)
+    await redirectTo(left, `${p.name} played Slip Away (passed to the left)`, { sound: false });
   },
 
   async a_cancel() { /* only played through cancelWindow() */ },

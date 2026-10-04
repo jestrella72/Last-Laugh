@@ -517,7 +517,7 @@ const NET = {
         quietly(() => revealWhoopsies(msg.card, { name: msg.name, isBot: true }));
         break;
       case 'redirect':   // only sent to the player who receives the card
-        redirectAlert({ name: msg.name, isBot: false }, msg.why, msg.card);
+        redirectAlert({ name: msg.name, isBot: false }, msg.why, msg.card, { sound: msg.sound !== false });
         break;
       case 'hurt':
         hurtOverlay(msg.title, msg.sub, 2600);
