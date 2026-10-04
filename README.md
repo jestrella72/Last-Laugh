@@ -16,6 +16,20 @@ python -m http.server 8090
 
 Then open http://localhost:8090.
 
+### 🌐 Playing online (everyone on their own phone)
+
+1. One person taps **🏠 Create a room**, types their name and picks a character.
+2. They get a **4-letter room code** and a link. Tap **📤 Share link** to send it (text, WhatsApp, etc.).
+3. Friends open the link (or tap **🔗 Join with a code** and type it), enter their name and pick a character.
+4. The host can **🤖 Add a bot** to fill seats, then taps **▶ Start game**.
+
+Each phone shows only that player's cards. When the game needs a decision from you (react, Cancel, pick a card…) it pops up on your phone.
+
+Good to know:
+- The **host's device runs the game**, so the host should keep the page open and the screen on (the game asks the phone to stay awake). A computer or tablet makes a great host.
+- If someone's phone drops out, **a bot plays for them** until they come back. They just open the link again with the same name, in the same browser tab, and they get their seat back.
+- Phones connect to each other directly (WebRTC via the free PeerJS service), so there's no server or account. A few very strict networks (some school or office Wi-Fi) can block this; switching to mobile data usually fixes it.
+
 ### 🤖 Playing with bots
 
 - Tap **Solo test: you vs 3 bots** to jump straight into a game against the computer.
@@ -78,6 +92,7 @@ Card counts are set in `cards.js`. Change the `copies` number to rebalance.
 | `game.js` | `Deck`, `Player`, `Game`: the rules and the state |
 | `sound.js` | `SoundManager`: the music loop and sound effects |
 | `bots.js` | `Bot`: how computer players make every decision |
+| `net.js` | `NET`: online rooms, the lobby, and sending questions to the right phone |
 | `app.js` | The UI controller: setup, turns, reactions, card effects, alerts |
 | `index.html` / `styles.css` | Page layout and the vintage cartoon look |
 | `images/cards/` | Final card art (WebP) |

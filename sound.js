@@ -193,7 +193,11 @@ class SoundManager {
     src.start(t);
   }
 
-  #ready() { return this.sfxOn && this.#ctx; }
+  // quiet = true mutes effects for a moment (online play uses it so a
+  // joined phone doesn't play the same sound twice)
+  quiet = false;
+
+  #ready() { return this.sfxOn && this.#ctx && !this.quiet; }
 
   // ── Sound effects ───────────────────────────────────────
   flip() {
@@ -237,7 +241,7 @@ class SoundManager {
   // The "FAHHH" — life lost or a Whoopsies redirected at you.
   // Music dips while it plays so it really lands.
   fahhh() {
-    if (!this.sfxOn) return;
+    if (!this.sfxOn || this.quiet) return;
     if (this.#music) {
       const g = this.#music.gain, t = this.#ctx.currentTime;
       g.cancelScheduledValues(t);

@@ -719,3 +719,45 @@ input, select { font-size: 16px !important; }   /* stops iPhone zooming into inp
   .hero-fan { transform: scale(.68); height: 160px; margin: -24px 0 -10px; }
   .logo { font-size: 3rem; }
 }
+
+/* ── Online rooms ────────────────────────────────────────── */
+.online-row { margin-top: 22px; padding-top: 18px; border-top: 3px dashed rgba(27,26,23,.25); }
+.code-input { flex: 0 0 130px !important; text-transform: uppercase; letter-spacing: 6px; font-family: var(--display) !important; text-align: center; }
+.room-code {
+  display: inline-block;
+  font-family: var(--display);
+  letter-spacing: 6px;
+  background: var(--yellow);
+  border: 3px solid var(--ink);
+  border-radius: 12px;
+  box-shadow: 3px 3px 0 var(--ink);
+  padding: 4px 6px 0 12px;
+  margin-left: 6px;
+}
+.lobby-share { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 16px; }
+.lobby-share input {
+  flex: 1 1 220px; min-width: 0; font: inherit; font-weight: 700;
+  border: 3px solid var(--ink); border-radius: 12px; padding: 8px 12px; background: #fff;
+}
+.lobby-seats { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
+.lobby-seat {
+  display: flex; align-items: center; gap: 12px;
+  background: #fff; border: 3px solid var(--ink); border-radius: 16px;
+  box-shadow: 3px 3px 0 var(--ink); padding: 8px 10px;
+}
+.lobby-seat.me { background: var(--yellow); }
+.lobby-seat .portrait { margin: 0; flex: none; width: 52px; height: 52px; }
+.lobby-seat-text { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.lobby-seat-text b { font-family: var(--display); font-weight: 400; font-size: 1.05rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lobby-seat-text span { font-weight: 700; font-size: .8rem; color: var(--ink-soft); }
+
+#net-banner {
+  display: none;
+  position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%);
+  z-index: 200; background: var(--red); color: #fff; font-weight: 800;
+  border: 3px solid var(--ink); border-radius: 999px; padding: 8px 16px;
+  box-shadow: var(--shadow); max-width: calc(100vw - 32px); text-align: center;
+}
+#net-banner.on { display: block; }
+.online-buttons { display: flex; gap: 12px; flex-wrap: wrap; }
+.online-buttons .btn { flex: 1 1 200px; }

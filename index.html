@@ -48,6 +48,40 @@
       <button class="btn btn-purple btn-big" onclick="startSolo(4)">🤖 Solo test: you vs 3 bots</button>
       <span class="sub">Or pick a number above and turn any seat into a bot.</span>
     </div>
+    <div class="online-row">
+      <h2>🌐 Play online</h2>
+      <p class="sub">Everyone plays on their own phone. Make a room and share the code.</p>
+      <div class="online-buttons">
+        <button class="btn btn-blue btn-big" onclick="startHostSetup()">🏠 Create a room</button>
+        <button class="btn btn-green btn-big" onclick="showJoinPanel()">🔗 Join with a code</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel" id="online-panel" style="display:none"></div>
+
+  <div class="panel" id="join-panel" style="display:none">
+    <h2>🔗 Join a room</h2>
+    <p class="sub">Ask the host for the 4-letter room code.</p>
+    <div class="name-row">
+      <input id="join-code" type="text" placeholder="CODE" maxlength="4" autocomplete="off" autocapitalize="characters" class="code-input">
+      <input id="join-name" type="text" placeholder="Your name…" maxlength="14" autocomplete="off">
+    </div>
+    <div class="setup-actions">
+      <button class="btn btn-plain" onclick="backToMenu()">← Back</button>
+      <button class="btn btn-green btn-big" onclick="submitJoin()">Join →</button>
+    </div>
+  </div>
+
+  <div class="panel" id="lobby" style="display:none">
+    <h2>Room <span id="lobby-code" class="room-code"></span></h2>
+    <p class="sub" id="lobby-sub"></p>
+    <div id="lobby-share" class="lobby-share">
+      <input id="lobby-link" type="text" readonly aria-label="Room link" onclick="this.select()">
+      <button class="btn btn-yellow" onclick="copyRoomLink()">📤 Share link</button>
+    </div>
+    <div id="lobby-seats" class="lobby-seats"></div>
+    <div class="setup-actions" id="lobby-actions"></div>
   </div>
 
   <div class="panel" id="setup-char" style="display:none">
@@ -136,6 +170,7 @@
      OVERLAYS
 ══════════════════════════════════════════ -->
 <div id="toasts"></div>
+<div id="net-banner" role="status"></div>
 
 <div id="modal-overlay" class="overlay">
   <div id="modal-box" role="dialog" aria-modal="true" aria-labelledby="modal-title">
@@ -197,10 +232,12 @@
   </div>
 </div>
 
+<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 <script src="cards.js"></script>
 <script src="game.js"></script>
 <script src="sound.js"></script>
 <script src="bots.js"></script>
+<script src="net.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

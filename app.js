@@ -12,6 +12,7 @@
 let G         = null;   // the Game instance — our source of truth
 let viewerIdx = null;   // whose private cards are on screen right now
 let busy      = false;  // true while a card/ability is being resolved
+let decider   = null;   // online: whose phone gets the next question
 
 class GameOver extends Error {}
 
@@ -94,6 +95,7 @@ function btnEl(label, cls, fn) {
 }
 
 function toast(text, card = null) {
+  if (NET.isHost && NET.started) NET.broadcast({ t: 'toast', text, card: packCard(card) });
   const t = document.createElement('div');
   t.className = 'toast';
   if (card) t.appendChild(cardEl(card));
@@ -115,19 +117,33 @@ function toast(text, card = null) {
  *   buttons: [{ label, cls, value, disabled }]
  * Resolves with the value of whatever was clicked.
  */
-let modalSeq = 0;
+let modalSeq  = 0;
+let openModal = null;   // { seq, done } of the dialog on screen
 
-function ask({ title, kicker = '', body = '', html = '', cards = [], players = [],
-               buttons = [], wide = false, single = false, auto = null }) {
+// Online, NET.route() sends the question to the right phone instead.
+// `who` = the player who answers; `local: true` = only on this screen.
+function ask(opts) {
+  return NET.route(opts) ?? askLocal(opts);
+}
+
+// Close the dialog on screen (only if it's still dialog `seq`)
+function closeModal(seq = null) {
+  if (openModal && (seq === null || openModal.seq === seq)) openModal.done(undefined);
+}
+
+function askLocal({ title, kicker = '', body = '', html = '', cards = [], players = [],
+                    buttons = [], wide = false, single = false, auto = null }) {
   return new Promise(resolve => {
     const seq = ++modalSeq;
     let closed = false;
     const done = v => {
       if (closed) return;
       closed = true;
-      $('modal-overlay').classList.remove('open');
+      if (openModal?.seq === seq) openModal = null;
+      if (seq === modalSeq) $('modal-overlay').classList.remove('open');
       resolve(v);
     };
+    openModal = { seq, done };
 
     // While a bot is playing, plain "OK" pop-ups close by themselves
     const passive = buttons.length <= 1 && !players.length && !cards.some(c => c.value !== undefined);
@@ -210,15 +226,15 @@ const yesNo = (title, body, yes = 'Yes', no = 'No', extra = {}) =>
 async function pickPlayer(title, body, players, { kicker = '', cancel = null, who = null, purpose = 'harm' } = {}) {
   if (who?.isBot) return Bot.pickPlayer(who, players, purpose);
   const buttons = cancel ? [{ label: cancel, cls: 'btn-plain', value: -1 }] : [];
-  const v = await ask({ title, body, kicker, players, buttons, wide: players.length > 3 });
-  return v === -1 ? null : G.players[v];
+  const v = await ask({ title, body, kicker, players, buttons, wide: players.length > 3, who });
+  return v === -1 || v === undefined ? null : G.players[v];
 }
 
 async function pickFromHand(player, title, body, { cancel = null, kicker = '', who = player, purpose = 'discard' } = {}) {
   if (who.isBot) return Bot.pickCard(who, player.hand, purpose);
   const cards   = player.hand.map(c => ({ card: c, value: c.instanceId }));
   const buttons = cancel ? [{ label: cancel, cls: 'btn-plain', value: null }] : [];
-  const id = await ask({ title, body, kicker, cards, buttons, wide: cards.length > 3 });
+  const id = await ask({ title, body, kicker, cards, buttons, wide: cards.length > 3, who });
   return id ? player.hand.find(c => c.instanceId === id) : null;
 }
 
@@ -228,7 +244,7 @@ async function arrange(kicker, title, cards, who = null, kind = 'whoopsies') {
   let picked = [];
   for (;;) {
     const v = await ask({
-      kicker, title, wide: true,
+      kicker, title, wide: true, who,
       body: 'Tap the cards in the order you want them. Your first tap goes on top.',
       cards: cards.map((c, i) => ({
         card: c,
@@ -242,10 +258,29 @@ async function arrange(kicker, title, cards, who = null, kind = 'whoopsies') {
       ],
     });
     if (v === 'reset') picked = [];
-    else if (v === 'done') {
+    else if (v === 'done' || v === undefined) {
       return [...picked, ...cards.map((_, i) => i).filter(i => !picked.includes(i))];
     } else picked.push(v);
   }
+}
+
+// Ask several players at once; resolves with the first who says yes
+// (the others' questions are withdrawn), or null if everyone says no.
+function firstYes(players, makeOpts) {
+  players = players.filter(p => !p.isBot);
+  if (!players.length) return Promise.resolve(null);
+  return new Promise(resolve => {
+    let left = players.length, done = false;
+    const handles = players.map(p => NET.askHandle({ ...makeOpts(p), who: p }));
+    handles.forEach((h, i) => h.promise.then(v => {
+      if (done) return;
+      if (v === true) {
+        done = true;
+        handles.forEach(o => { if (o !== h) o.cancel(); });
+        resolve(players[i]);
+      } else if (--left === 0) { done = true; resolve(null); }
+    }));
+  });
 }
 
 // =============================================================
@@ -255,6 +290,16 @@ async function arrange(kicker, title, cards, who = null, kind = 'whoopsies') {
 function passTo(player, msg, { force = false, kicker = 'Pass the device to', button } = {}) {
   // Bots don't need the device, and with one human there's nobody to hide from
   if (player.isBot) return Promise.resolve();
+  // Online everyone has their own phone: just note who decides next
+  if (NET.on) {
+    decider = player.id;
+    if (force) {
+      if (player.id === NET.localIdx) toast(`🎉 Your turn, ${player.name}!`);
+      else NET.sendTo(player.id, { t: 'toast', text: `🎉 Your turn, ${player.name}!` });
+    }
+    renderAll();
+    return Promise.resolve();
+  }
   if (G.humans.length === 1) {
     viewerIdx = player.id;
     if (force) toast(`🎉 Your turn, ${player.name}!`);
@@ -288,6 +333,7 @@ function restartAnimations(root) {
 }
 
 function revealWhoopsies(card, target) {
+  if (NET.isHost) NET.broadcast({ t: 'reveal', card: packCard(card), name: target.name });
   SFX.flip();
   return new Promise(resolve => {
     $('reveal-front').src = card.image;
@@ -299,17 +345,19 @@ function revealWhoopsies(card, target) {
     let closed = false;
     const close = () => { if (closed) return; closed = true; s.classList.remove('open'); resolve(); };
     $('reveal-btn').onclick = close;
-    if (target.isBot) setTimeout(close, 2300);
+    if (NET.on) setTimeout(close, 2600);
+    else if (target.isBot) setTimeout(close, 2300);
   });
 }
 
 // The shocked-emoji alert + FAHHH, shown whenever a Whoopsies
 // gets pushed onto someone else.
-function redirectAlert(toPlayer, why) {
+function redirectAlert(toPlayer, why, card = G.currentWhoopsies) {
+  if (NET.isHost) NET.broadcast({ t: 'redirect', name: toPlayer.name, why, card: packCard(card) });
   SFX.fahhh();
   return new Promise(resolve => {
     $('redirect-name').textContent = `${toPlayer.name}!`;
-    $('redirect-card-img').src     = G.currentWhoopsies.image;
+    $('redirect-card-img').src     = card.image;
     $('redirect-from').textContent = why;
     const s = $('redirect-screen');
     restartAnimations(s);
@@ -318,7 +366,8 @@ function redirectAlert(toPlayer, why) {
     let closed = false;
     const close = () => { if (closed) return; closed = true; s.classList.remove('open'); resolve(); };
     $('redirect-btn').onclick = close;
-    if (toPlayer.isBot) setTimeout(close, 2600);
+    if (NET.on) setTimeout(close, 3000);
+    else if (toPlayer.isBot) setTimeout(close, 2600);
   });
 }
 
@@ -339,7 +388,7 @@ async function hurt(player, opts = {}) {
     const nt = player.hand.find(c => c.id === 'a_not_today');
     if (nt && canReact(player, nt).ok) {
       const use = player.isBot || await yesNo('Not Today!?', `${player.name}, play Not Today! to stop losing this life?`,
-                                              'Not today! 🛑', 'Take the hit', { kicker: 'Last chance', cards: [{ card: nt }] });
+                                              'Not today! 🛑', 'Take the hit', { kicker: 'Last chance', cards: [{ card: nt }], who: player });
       if (use && (await playAction(player, nt)) === 'negated') return false;
     }
   }
@@ -352,21 +401,28 @@ async function hurt(player, opts = {}) {
   }
   SFX.fahhh();
   botSay(player, 'hurt', .6);
-  await new Promise(resolve => {
-    $('hurt-title').textContent = player.isEliminated ? `${player.name} is OUT!` : `${player.name} loses a life!`;
-    $('hurt-sub').textContent   = player.isEliminated ? '💀 No lives left.' : `${'❤️'.repeat(player.lives)} left`;
-    const s = $('hurt-screen');
-    restartAnimations(s);
-    s.classList.add('open');
-    const close = () => { s.classList.remove('open'); clearTimeout(timer); resolve(); };
-    const timer = setTimeout(close, 3200);
-    $('hurt-btn').onclick = close;
-  });
+  const title = player.isEliminated ? `${player.name} is OUT!` : `${player.name} loses a life!`;
+  const sub   = player.isEliminated ? '💀 No lives left.' : `${'❤️'.repeat(player.lives)} left`;
+  if (NET.isHost) NET.broadcast({ t: 'hurt', title, sub });
+  await hurtOverlay(title, sub, NET.on ? 2600 : 3200);
   if (G.checkWinner()) {
     showWinner();
     throw new GameOver();
   }
   return true;
+}
+
+function hurtOverlay(title, sub, ms) {
+  return new Promise(resolve => {
+    $('hurt-title').textContent = title;
+    $('hurt-sub').textContent   = sub;
+    const s = $('hurt-screen');
+    restartAnimations(s);
+    s.classList.add('open');
+    const close = () => { s.classList.remove('open'); clearTimeout(timer); resolve(); };
+    const timer = setTimeout(close, ms);
+    $('hurt-btn').onclick = close;
+  });
 }
 
 function dieHTML(n) {
@@ -375,8 +431,9 @@ function dieHTML(n) {
 }
 
 async function diceAnimation(value, caption, auto = null) {
+  if (NET.isHost) { NET.broadcast({ t: 'dice', value, caption }); auto = 1900; }
   SFX.dice();
-  const p = ask({ auto,
+  const p = ask({ auto, local: true,
     kicker: '🎲 Roll!', title: caption,
     html: `<div class="die rolling" id="die">${dieHTML(1)}</div><div class="roll-result" id="roll-result">…</div>`,
     buttons: [{ label: 'OK', cls: 'btn-yellow', value: true }],
@@ -414,6 +471,20 @@ async function roll(player, reason) {
     }
     const mels = allMels.filter(m => !m.isBot);
     if (!mels.length) break;
+    if (NET.on) {
+      const m = await firstYes(mels, () => ({
+        kicker: 'Melo Mel', title: `Re-roll that ${value}?`, cards: [{ card: mels[0].character }],
+        body: `${player.name} rolled a ${value} for ${reason}. Use Melo Mel to re-roll it?`,
+        buttons: [{ label: 'Re-roll!', cls: 'btn-purple', value: true }, { label: 'Keep it', cls: 'btn-plain', value: false }],
+      }));
+      if (!m) break;
+      m.useAbility();
+      value = Game.rollDie();
+      G.addLog(`🎵 ${m.name} (Melo Mel) re-rolls… ${value}!`);
+      renderAll();
+      await diceAnimation(value, `Melo Mel re-roll for ${player.name}`);
+      continue;
+    }
     const v = await ask({
       kicker: 'Melo Mel', title: `Re-roll that ${value}?`,
       body: `${player.name} rolled a ${value} for ${reason}. Melo Mel can re-roll any dice roll.`,
@@ -435,10 +506,17 @@ async function roll(player, reason) {
 }
 
 async function coinFlip(caller, call) {
-  SFX.coin();
   const result = Game.flipCoin();
-  const p = ask({
-    kicker: '🪙 Coin flip', title: `${caller.name} calls ${call.toUpperCase()}`,
+  const title = `${caller.name} calls ${call.toUpperCase()}`;
+  if (NET.isHost) NET.broadcast({ t: 'coin', title, result, call });
+  await coinAnimation(title, result, call, NET.on ? 1500 : null);
+  return result === call;
+}
+
+async function coinAnimation(title, result, call, auto = null) {
+  SFX.coin();
+  const p = ask({ auto, local: true,
+    kicker: '🪙 Coin flip', title,
     html: `<div class="coin flipping" id="coin">?</div><div class="roll-result" id="coin-result">…</div>`,
     buttons: [{ label: 'OK', cls: 'btn-yellow', value: true }],
   });
@@ -451,7 +529,6 @@ async function coinFlip(caller, call) {
   SFX.coin();
   ok.disabled = false;
   await p;
-  return result === call;
 }
 
 // =============================================================
@@ -461,6 +538,7 @@ async function coinFlip(caller, call) {
 let setupCount = 0, setupPlayers = [], setupChoice = null;
 let setupSeatBot = false;   // is the seat being set up a bot?
 let setupSolo    = false;   // "Solo test": fill the other seats with bots
+let setupMode    = 'local'; // 'local' | 'host' (create room) | 'join' (joined a room)
 
 const BOT_NAMES = {
   c_carl: 'Carl', c_casey: 'Casey', c_pete: 'Pete', c_bella: 'Bella', c_luke: 'Luke', c_nina: 'Nina',
@@ -473,6 +551,7 @@ function renderCountButtons() {
 }
 
 function startSetup(n, solo = false) {
+  setupMode    = 'local';
   setupCount   = n;
   setupPlayers = [];
   setupSolo    = solo;
@@ -484,6 +563,7 @@ function startSetup(n, solo = false) {
 function startSolo(n) { startSetup(n, true); }
 
 function setupBack() {
+  if (setupMode !== 'local') { location.href = location.pathname; return; }
   if (setupPlayers.length) {
     setupPlayers.pop();
     renderCharSelect();
@@ -502,14 +582,21 @@ function setSeatBot(isBot) {
 
 function renderCharSelect() {
   const lives = setupCount <= 3 ? 3 : setupCount <= 5 ? 2 : 1;
-  $('setup-title').textContent = setupSolo
+  const online = setupMode !== 'local';
+  document.querySelector('#setup-char .name-row').style.display = setupMode === 'join' ? 'none' : '';
+  $('setup-title').textContent = setupMode === 'host' ? 'Create a room · pick your character'
+    : setupMode === 'join' ? `Room ${NET.code} · pick your character`
+    : setupSolo
     ? `Solo test · you vs ${setupCount - 1} bots · ${lives} ${lives === 1 ? 'life' : 'lives'} each`
     : `Player ${setupPlayers.length + 1} of ${setupCount}  ·  ${lives} ${lives === 1 ? 'life' : 'lives'} each`;
   $('name-input').value = '';
+  const keep = setupMode === 'join' ? setupChoice : null;   // lobby refresh: keep my pick
   setupChoice = null;
   setSeatBot(false);
-  document.querySelector('.seat-toggle').style.display = setupSolo ? 'none' : '';
-  const taken = setupPlayers.map(p => p.character.id);
+  document.querySelector('.seat-toggle').style.display = setupSolo || online ? 'none' : '';
+  const taken = setupMode === 'join'
+    ? (NET.lobby?.seats || []).map(s => s.charId).filter(Boolean)
+    : setupPlayers.map(p => p.character.id);
   const grid  = $('char-grid');
   grid.innerHTML = '';
   for (const c of CHARACTER_CARDS) {
@@ -525,7 +612,8 @@ function renderCharSelect() {
     b.onclick = () => selectCharacter(c.id);
     grid.appendChild(b);
   }
-  setTimeout(() => $('name-input').focus(), 50);
+  if (keep && !taken.includes(keep.id)) selectCharacter(keep.id);
+  if (setupMode !== 'join') setTimeout(() => $('name-input').focus(), 50);
 }
 
 function selectCharacter(id) {
@@ -553,7 +641,18 @@ function addBotSeat(character) {
 
 async function confirmCharacter() {
   if (setupSeatBot && !setupChoice) setupChoice = randomFreeCharacter();
-  if (!setupChoice) { await info('Pick a character!', 'Tap one of the character cards first.'); return; }
+  if (!setupChoice) { await info('Pick a character!', 'Tap one of the character cards first.', { local: true }); return; }
+  if (setupMode === 'host') {
+    const name = $('name-input').value.trim() || 'Host';
+    try { localStorage.setItem('ll-name', name); } catch {}
+    NET.createRoom(name, setupChoice);
+    return;
+  }
+  if (setupMode === 'join') {
+    NET.send({ t: 'pick', charId: setupChoice.id });
+    showLobbyPanel('Saving your pick…');
+    return;
+  }
   const isLastSeat = setupPlayers.length === setupCount - 1;
   if (setupSeatBot && isLastSeat && !setupPlayers.some(p => !p.isBot)) {
     await info('Need a human!', 'At least one seat has to be a real player.');
@@ -582,7 +681,8 @@ $('name-input').addEventListener('keydown', e => { if (e.key === 'Enter') confir
 function startGame() {
   G = new Game(setupPlayers);
   G.addLog(`Welcome to Last Laugh! ${G.players.length} players, ${G.players[0].maxLives} ${G.players[0].maxLives === 1 ? 'life' : 'lives'} each.`, 'turn');
-  if (G.humans.length === 1) viewerIdx = G.humans[0].id;
+  if (NET.isHost) viewerIdx = NET.localIdx;
+  else if (G.humans.length === 1) viewerIdx = G.humans[0].id;
   $('setup-screen').classList.remove('active');
   $('game-screen').classList.add('active');
   setupChat();
@@ -595,7 +695,9 @@ function startGame() {
 // =============================================================
 
 function renderAll() {
+  if (NET.isClient) return NET.renderClient();
   if (!G) return;
+  NET.pushState();
   renderPlayers();
   renderTable();
   renderFeed();
@@ -626,7 +728,7 @@ function renderTable() {
     if (face.dataset.iid !== w.instanceId) {
       face.innerHTML = '';
       const el = cardEl(w, { cls: 'pickable flip-in' });
-      el.onclick = () => ask({ kicker: '⚠️ Whoopsies', title: w.name, cards: [{ card: w }], single: true,
+      el.onclick = () => ask({ local: true, kicker: '⚠️ Whoopsies', title: w.name, cards: [{ card: w }], single: true,
                                buttons: [{ label: 'Close', cls: 'btn-yellow', value: 0 }] });
       face.appendChild(el);
       face.dataset.iid = w.instanceId;
@@ -649,8 +751,10 @@ function renderTable() {
 function renderHand(newCardId = null) {
   const hand = $('hand');
   hand.innerHTML = '';
-  const p = G.currentPlayer;
-  if (viewerIdx !== p.id) {
+  // Online the host always sees their own hand; locally, whoever's turn it is
+  const p = NET.isHost ? G.players[NET.localIdx] : G.currentPlayer;
+  const myTurn = p.id === G.currentPlayerIdx;
+  if (!NET.isHost && viewerIdx !== p.id) {
     const viewer = viewerIdx === null ? null : G.players[viewerIdx];
     hand.innerHTML = `<div class="hand-hidden">${cardEl({ name: 'Hidden hand', image: CARD_BACKS.action }).outerHTML}
       <span>${viewer ? `${esc(viewer.name)} has the device. ` : ''}${esc(p.name)}'s cards are hidden.</span></div>`;
@@ -661,7 +765,7 @@ function renderHand(newCardId = null) {
     return;
   }
   for (const c of p.hand) {
-    const check = busy ? { ok: false } : canPlayOnTurn(p, c);
+    const check = busy || !myTurn ? { ok: false } : canPlayOnTurn(p, c);
     const el = cardEl(c, { cls: (check.ok ? 'pickable' : 'dim') + (c.instanceId === newCardId ? ' new' : '') });
     el.style.opacity = check.ok || busy ? '' : '.7';
     el.tabIndex = 0;
@@ -681,7 +785,7 @@ function renderFeed() {
 }
 
 function showCharacter(p) {
-  ask({
+  ask({ local: true,
     kicker: `${p.name}'s character`, title: p.character.name, single: true,
     cards: [{ card: p.character }],
     html: `<p><span class="tag tag-${p.character.timing}">${p.character.timingLabel}</span></p>
@@ -700,7 +804,11 @@ const QUICK_LINES = ['FAHHH!', 'Not today! 😤', 'Sorry not sorry 😈', 'Nooo!
 function setupChat() {
   const sel = $('chat-speaker');
   sel.innerHTML = G.humans.map(p => `<option value="${p.id}">${esc(p.name)} says…</option>`).join('');
-  sel.style.display = G.humans.length > 1 ? '' : 'none';
+  sel.style.display = G.humans.length > 1 && !NET.on ? '' : 'none';
+  setupQuickLines();
+}
+
+function setupQuickLines() {
   $('quick-row').innerHTML = '';
   for (const line of QUICK_LINES) {
     const b = document.createElement('button');
@@ -718,12 +826,19 @@ function setupChat() {
   };
 }
 
-function sendChat(text, who = G.players[+$('chat-speaker').value]) {
+function sendChat(text, who = null) {
+  if (NET.isClient) { NET.send({ t: 'chat', text }); return; }
+  who = who ?? G.players[NET.isHost ? NET.localIdx : +$('chat-speaker').value];
   G.log.unshift({ kind: 'chat', who: who.name, text, turn: G.turn });
   renderFeed();
   $('feed').scrollTop = $('feed').scrollHeight;
-  // speech bubble over that player's chip
-  const chip = document.querySelector(`#players-bar .chip[data-pid="${who.id}"]`);
+  showBubble(who.id, text);
+  if (NET.isHost) { NET.broadcast({ t: 'bubble', pid: who.id, text }); NET.pushState(); }
+}
+
+// speech bubble over a player's chip
+function showBubble(pid, text) {
+  const chip = document.querySelector(`#players-bar .chip[data-pid="${pid}"]`);
   if (chip) {
     chip.querySelector('.bubble')?.remove();
     const b = document.createElement('div');
@@ -762,6 +877,7 @@ async function startTurn() {
 // A bot's whole turn: play a few cards, maybe use its ability, flip.
 async function runBotTurn(p) {
   await sleep(900);
+  if (G.flippedThisTurn) return botFinishTurn(p);   // took over mid-turn
   for (let i = 0; i < 2 && !G.winner; i++) {
     const card = Bot.chooseTurnCard(p);
     if (!card) break;
@@ -781,6 +897,10 @@ async function runBotTurn(p) {
   }
   G.flippedThisTurn = true;
   await faceWhoopsies(G.whoopsiesDeck.draw(), p.id);
+  return botFinishTurn(p);
+}
+
+async function botFinishTurn(p) {
   if (!p.isEliminated && !G.winner) {
     await sleep(700);
     const card = Bot.chooseTurnCard(p);
@@ -793,6 +913,15 @@ async function runBotTurn(p) {
   return endTurn();
 }
 
+// Online: a bot finishes the turn of a player who lost connection
+async function botTakeover(p) {
+  busy = true;
+  renderAll();
+  try { await runBotTurn(p); }
+  catch (e) { if (!(e instanceof GameOver)) console.error(e); }
+  finally { busy = false; }
+}
+
 function setChatSpeaker(p) {
   const sel = $('chat-speaker');
   if (sel) sel.value = String(p.id);
@@ -801,6 +930,13 @@ function setChatSpeaker(p) {
 function renderMain() {
   const p = G.currentPlayer;
   $('panel-title').textContent = `${p.name}'s turn`;
+  if (NET.isHost && !p.isBot && p.id !== NET.localIdx) {
+    $('panel-title').textContent = `⏳ ${p.name}'s turn`;
+    $('panel-sub').textContent = 'They’re playing on their phone. Your reaction cards pop up when you can use them.';
+    $('panel-buttons').innerHTML = '';
+    renderHand();
+    return;
+  }
   if (p.isBot) {
     $('panel-title').textContent = `🤖 ${p.name} is playing…`;
     $('panel-sub').textContent = "Sit back and watch. You'll get a chance to react when a Whoopsies comes up.";
@@ -817,7 +953,7 @@ function renderMain() {
 
   const btns = $('panel-buttons');
   btns.innerHTML = '';
-  if (viewerIdx === p.id) {
+  if (NET.isHost ? p.id === NET.localIdx : viewerIdx === p.id) {
     if (G.flippedThisTurn) btns.appendChild(btnEl('✋ End turn (draw 1)', 'btn-green btn-big', onEndTurn));
     else btns.appendChild(btnEl('⚠️ Flip a Whoopsies!', 'btn-red btn-big', onFlip));
     const a = p.character;
@@ -916,9 +1052,10 @@ function canPlayOnTurn(p, c) {
 
 async function onHandCardClick(card) {
   if (busy) return;
-  const p = G.currentPlayer;
-  const check = canPlayOnTurn(p, card);
-  const v = await ask({
+  const p = NET.isHost ? G.players[NET.localIdx] : G.currentPlayer;
+  const check = p.id === G.currentPlayerIdx ? canPlayOnTurn(p, card)
+    : { ok: false, reason: 'Wait for your turn. When you can react, the game will ask you.' };
+  const v = await ask({ local: true,
     kicker: 'Action card', title: card.name, single: true,
     cards: [{ card }],
     html: `<p><span class="tag tag-${card.timing}">${card.timingLabel}</span></p>
@@ -965,7 +1102,14 @@ async function cancelWindow(player, card) {
   if (!holders.length) return true;
   let v = holders.find(h => h.isBot && Bot.wantsCancel(h, player, card))?.id ?? -1;
   const humanHolders = holders.filter(h => !h.isBot);
-  if (v === -1 && humanHolders.length) {
+  if (v === -1 && humanHolders.length && NET.on) {
+    const c = await firstYes(humanHolders, () => ({
+      kicker: '✋ Cancel?', title: `${player.name} plays ${card.name}`, cards: [{ card }],
+      body: 'Stop it with your Cancel card?',
+      buttons: [{ label: 'Cancel it!', cls: 'btn-red', value: true }, { label: 'Let it happen', cls: 'btn-plain', value: false }],
+    }));
+    v = c ? c.id : -1;
+  } else if (v === -1 && humanHolders.length) {
     v = await ask({
       kicker: '✋ Cancel?', title: `${player.name} plays ${card.name}`,
       body: 'You can stop it right now with a Cancel card.',
@@ -976,7 +1120,7 @@ async function cancelWindow(player, card) {
       ],
     });
   }
-  if (v === -1) return true;
+  if (v === -1 || v === undefined) return true;
   const canceller = G.players[v];
   const cancelCard = canceller.hand.find(c => c.id === 'a_cancel');
   canceller.removeFromHand(cancelCard.instanceId);
@@ -997,7 +1141,7 @@ async function rickCopy(player, card) {
   for (const r of ricks) {
     if (card.id === 'a_second_chance' && r.lives >= r.maxLives) continue;
     const yes = r.isBot ? Bot.wantsCopy(card) : await yesNo('Slick Rick 🎩', `${r.name}, use ${card.name}'s effect for yourself too? (${r.abilitiesLeft} uses left)`,
-                            'Copy it!', 'No thanks', { kicker: 'Reaction', cards: [{ card: r.character }] });
+                            'Copy it!', 'No thanks', { kicker: 'Reaction', cards: [{ card: r.character }], who: r });
     if (!yes) continue;
     r.useAbility();
     G.addLog(`🎩 ${r.name} (Slick Rick) copies ${card.name}!`);
@@ -1012,7 +1156,7 @@ async function rickCopy(player, card) {
 async function luckyLukeBlocks(target, cardName) {
   if (target.character.id !== 'c_luke' || !target.canUseAbility()) return false;
   const yes = target.isBot || await yesNo('Lucky Luke 🍀', `${target.name}, roll to cancel ${cardName}? You need a 4 or higher. (${target.abilitiesLeft} uses left)`,
-                          'Roll for it!', 'No', { kicker: 'Reaction', cards: [{ card: target.character }] });
+                          'Roll for it!', 'No', { kicker: 'Reaction', cards: [{ card: target.character }], who: target });
   if (!yes) return false;
   target.useAbility();
   const r = await roll(target, 'Lucky Luke');
@@ -1096,7 +1240,7 @@ const EFFECTS = {
   async a_recover(p) {
     const pile = G.actionDeck.getAllDiscards().filter(c => c.id !== 'a_recover');
     if (!pile.length) { await info('Recover', 'Nothing worth recovering in the discard pile.'); return; }
-    const id = p.isBot ? Bot.pickCard(p, pile, 'recover').instanceId : await ask({ kicker: 'Recover', title: 'Take 1 card from the discard pile', wide: true,
+    const id = p.isBot ? Bot.pickCard(p, pile, 'recover').instanceId : await ask({ who: p, kicker: 'Recover', title: 'Take 1 card from the discard pile', wide: true,
                            cards: pile.map(c => ({ card: c, value: c.instanceId })) });
     const card = G.actionDeck.recoverFromDiscard(id);
     p.hand.push(card);
@@ -1152,7 +1296,7 @@ function onAbility() {
   if (!canUseTurnAbility(p).ok) return;
   runFlow(async () => {
     const ok = await yesNo(p.character.name, `${p.character.abilityText} (${p.abilitiesLeft} uses left)`, 'Use it!', 'Not now',
-                           { kicker: 'Ability', cards: [{ card: p.character }] });
+                           { kicker: 'Ability', cards: [{ card: p.character }], who: p });
     if (!ok) return;
     p.useAbility();
     G.addLog(`✨ ${p.name} uses ${p.character.name}.`);
@@ -1183,14 +1327,14 @@ const ABILITIES = {
     t.hand.push(give);
     p.hand.push(got);
     G.addLog(`🥧 ${p.name} (Prankster Pete) trades a card with ${t.name}.`);
-    if (!p.isBot) await info('Trade!', `You gave ${give.name} and got ${got.name}.`, { cards: [{ card: got }] });
+    if (!p.isBot) await info('Trade!', `You gave ${give.name} and got ${got.name}.`, { cards: [{ card: got }], who: p });
   },
 
   async c_nina(p) {
     const others = G.activePlayers.filter(o => o.id !== p.id);
     const t = await pickPlayer('Naive Nina', 'Whose hand gets revealed?', others, { who: p, purpose: 'cards' });
     G.addLog(`👀 ${p.name} (Naive Nina) reveals ${t.name}'s hand.`);
-    const call = p.isBot ? (t.hand.length ? Game.flipCoin() : null) : await ask({
+    const call = p.isBot ? (t.hand.length ? Game.flipCoin() : null) : await ask({ who: p,
       kicker: 'Naive Nina', title: `${t.name}'s hand`, wide: true,
       body: t.hand.length ? 'Now call the coin. Call it right and you trash 1 of these cards.' : `${t.name} has no cards!`,
       cards: t.hand.map(c => ({ card: c })),
@@ -1273,6 +1417,18 @@ async function reactionWindow() {
     const humans = G.activePlayers.filter(p => !p.isBot && hasReaction(p));
     if (!humans.length) return 'resolve';
 
+    if (NET.on) {
+      const reactor = await firstYes(humans, p => ({
+        kicker: '⚠️ Whoopsies!', title: w.name, cards: [{ card: w }],
+        body: p.id === t.id ? 'This one is aimed at YOU. React before it resolves?' : `${t.name} is facing this. Want to react?`,
+        buttons: [{ label: '🃏 React!', cls: 'btn-yellow', value: true }, { label: 'Pass', cls: 'btn-plain', value: false }],
+      }));
+      if (!reactor) return 'resolve';
+      const r = await reactorTurn(reactor);
+      if (r === 'negated' || r === 'avoided') return r;
+      continue;
+    }
+
     const solo = G.humans.length === 1;
     const v = await ask({
       kicker: '⚠️ Whoopsies!', title: w.name, wide: !solo,
@@ -1344,7 +1500,7 @@ async function reactorTurn(reactor) {
     if (ch.id === 'c_lou' && reactor.id === G.currentPlayerIdx) abilityButtons.push({ label: `🥊 Grumpy Lou: swap it (${reactor.abilitiesLeft} left)`, cls: 'btn-purple', value: 'lou' });
   }
 
-  const v = await ask({
+  const v = await ask({ who: reactor,
     kicker: `${reactor.name} reacts`, title: 'Pick a reaction', wide: true,
     body: `${G.whoopsiesTarget.name} faces "${w.name}".` + (w.unstoppable ? ' Only Slip Away or Redirect can stop this one!' : ''),
     cards: reactor.hand.map(c => {
@@ -1354,7 +1510,7 @@ async function reactorTurn(reactor) {
     buttons: [...abilityButtons, { label: 'Never mind', cls: 'btn-plain', value: 'back' }],
   });
 
-  if (v === 'back') return 'none';
+  if (v === 'back' || v === undefined) return 'none';
   return doReaction(reactor, v === 'rosie' || v === 'lou'
     ? { type: v }
     : { type: 'card', card: reactor.hand.find(c => c.instanceId === v) });
@@ -1398,7 +1554,7 @@ async function caseyCheck(p) {
   if (G.winner || p.isEliminated) return;
   if (p.character.id !== 'c_casey' || !p.canUseAbility() || p.id !== G.currentPlayerIdx) return;
   const yes = p.isBot || await yesNo('Cautious Casey', `${p.name}, draw 1 Action card? (${p.abilitiesLeft} uses left)`,
-                          'Draw!', 'Save it', { cards: [{ card: p.character }] });
+                          'Draw!', 'Save it', { cards: [{ card: p.character }], who: p });
   if (!yes) return;
   p.useAbility();
   const c = G.actionDeck.draw();
@@ -1473,7 +1629,13 @@ const RESOLVERS = {
     }
     let s = savers.find(o => o.isBot && Bot.wantsToSave(o)) ?? null;
     const humanSavers = savers.filter(o => !o.isBot);
-    if (!s && humanSavers.length) {
+    if (!s && humanSavers.length && NET.on) {
+      s = await firstYes(humanSavers, () => ({
+        kicker: '👟 Shoelaces near a cliff', title: `Save ${t.name}?`,
+        body: 'Discard an Action card to save them. You both draw 1 card.',
+        buttons: [{ label: 'Save them!', cls: 'btn-green', value: true }, { label: 'No', cls: 'btn-plain', value: false }],
+      }));
+    } else if (!s && humanSavers.length) {
       s = await pickPlayer(`Will anyone save ${t.name}?`,
         'A player who discards an Action card saves them, and you both draw 1 card.',
         humanSavers, { kicker: '👟 Shoelaces near a cliff', cancel: 'Nobody, sorry!' });
@@ -1501,14 +1663,14 @@ const RESOLVERS = {
       await hurt(t);
       return;
     }
-    const v = t.isBot ? Bot.pickPlayer(t, others).id : await ask({
+    const v = t.isBot ? Bot.pickPlayer(t, others).id : await ask({ who: t,
       kicker: '🐻 Tried to hug a bear', title: `${t.name}, pass the bear?`,
       body: 'Choose another player to take this Whoopsies card, or keep it and lose 1 life.',
       players: others,
       buttons: [{ label: '💔 Keep it, lose 1 life', cls: 'btn-red', value: 'keep' }],
       wide: others.length > 3,
     });
-    if (v === 'keep') { await hurt(t); return; }
+    if (v === 'keep' || v === undefined) { await hurt(t); return; }
     botSay(t, 'redirect');
     await redirectTo(v, `${t.name} handed you the bear hug`);
     await hurt(G.whoopsiesTarget);
@@ -1516,7 +1678,7 @@ const RESOLVERS = {
 
   async w_leftovers(t) {
     await passTo(t, 'Choose how to handle the mystery leftovers.');
-    const choice = t.isBot ? Bot.leftoversChoice(t) : await ask({
+    const choice = t.isBot ? Bot.leftoversChoice(t) : await ask({ who: t,
       kicker: '🍲 Ate mystery leftovers', title: `${t.name}, choose one`,
       buttons: [
         { label: '💔 Lose 1 life', cls: 'btn-red', value: 'life' },
@@ -1574,7 +1736,7 @@ const RESOLVERS = {
       if (canL && canR && leftIdx !== rightIdx && t.isBot) {
         to = Bot.leader([G.players[leftIdx], G.players[rightIdx]]).id;
       } else if (canL && canR && leftIdx !== rightIdx) {
-        to = await ask({
+        to = await ask({ who: t,
           kicker: '🎰 Out of Luck!!', title: `${t.name} rolled ${r}! Pass it on`,
           body: 'Pass this card left or right. They must roll for it immediately.',
           buttons: [
@@ -1615,7 +1777,7 @@ function showWinner() {
 }
 
 function showRules() {
-  ask({
+  ask({ local: true,
     kicker: 'Rules', title: 'How to play Last Laugh', wide: true,
     html: `<div class="rules">
       <h4>Goal</h4>
