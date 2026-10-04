@@ -389,7 +389,7 @@ function redirectAlert(toPlayer, why, card = G.currentWhoopsies) {
 
 // Sending a Whoopsies to someone puts it on THEIR table: they face it
 // on their own turn. For the player who sent it, it's over.
-async function redirectTo(idx, why, { passedBear = false } = {}) {
+async function redirectTo(idx, why, { passedBear = G.currentPassedBear } = {}) {
   const p = G.players[idx], card = G.currentWhoopsies;
   p.table.push({ card, why, passedBear });
   G.sentAway = true;
@@ -1492,6 +1492,7 @@ async function faceWhoopsies(card, targetIdx, { revealed = false, passedBear = f
   G.currentWhoopsies   = card;
   G.whoopsiesTargetIdx = targetIdx;
   G.sentAway           = false;        // set when it's sent to someone's table
+  G.currentPassedBear  = passedBear;   // a bear that was already passed can't be passed again
   G.addLog(`⚠️ Whoopsies! ${G.whoopsiesTarget.name} faces "${card.name}".`, 'whoops');
   renderAll();
   if (!revealed) await revealWhoopsies(card, G.whoopsiesTarget);
@@ -1503,6 +1504,7 @@ async function faceWhoopsies(card, targetIdx, { revealed = false, passedBear = f
   const sent = G.sentAway;
   if (!sent) G.whoopsiesDeck.discard(G.currentWhoopsies);   // sent cards stay on a table
   G.currentWhoopsies = null;
+  G.currentPassedBear = false;
   renderAll();
   if (!sent) await caseyCheck(resolver);
 }
@@ -1771,9 +1773,15 @@ const RESOLVERS = {
     await info('Saved!', `${s.name} grabbed ${t.name} just in time. You both draw a card.`);
   },
 
-  // Pass the bear to another player's table (they deal with it on their
-  // turn, and may pass it on again), or keep it and lose 1 life.
+  // "When this card enters play" (flipped from the deck) you may pass it
+  // to another player's table. Whoever gets it faces it on their turn and
+  // can't pass it again: they lose 1 life unless a card saves them.
   async w_bear(t) {
+    if (G.currentPassedBear) {
+      await info('Tried to hug a bear 🐻', `This bear was passed to ${t.name}, so it can't be passed again. Hug time!`);
+      await hurt(t);
+      return;
+    }
     const others = G.activePlayers.filter(o => o.id !== t.id && G.canReceive(o));
     if (!others.length) {
       await info('Tried to hug a bear 🐻', `Everyone else's table is full. ${t.name} keeps the bear.`);
@@ -1789,7 +1797,7 @@ const RESOLVERS = {
     });
     if (v === 'keep' || v === undefined) { await hurt(t); return; }
     botSay(t, 'redirect');
-    await redirectTo(v, `${t.name} handed you the bear hug`);
+    await redirectTo(v, `${t.name} handed you the bear hug`, { passedBear: true });
   },
 
   async w_leftovers(t) {
