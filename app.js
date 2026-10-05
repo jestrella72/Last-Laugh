@@ -736,6 +736,8 @@ $('name-input').addEventListener('keydown', e => { if (e.key === 'Enter') confir
 
 function startGame() {
   G = new Game(setupPlayers);
+  const logReset = G.whoopsiesDeck.onReshuffle;
+  G.whoopsiesDeck.onReshuffle = () => { logReset(); toast('🔄 The Whoopsies deck ran out and was reset!'); };
   G.addLog(`Welcome to Last Laugh! ${G.players.length} players, ${G.players[0].maxLives} ${G.players[0].maxLives === 1 ? 'life' : 'lives'} each.`, 'turn');
   if (NET.isHost) viewerIdx = NET.localIdx;
   else if (G.humans.length === 1) viewerIdx = G.humans[0].id;
@@ -793,7 +795,7 @@ function renderTable() {
   } else tt.style.display = 'none';
 
   $('whoopsies-count').textContent = `${G.whoopsiesDeck.size} left`;
-  $('action-count').textContent    = `${G.actionDeck.size} left`;
+  $('action-count').textContent    = G.actionDeck.size ? `${G.actionDeck.size} left` : 'empty: no more draws';
 
   const face = $('whoopsies-face');
   const w = G.currentWhoopsies;
@@ -1057,7 +1059,8 @@ function renderMain() {
   let sub = p.table.length
     ? `You have ${p.table.length} Whoopsies waiting on your table. Face ${p.table.length > 1 ? 'them' : 'it'} first (you can play cards before), then flip your own.`
     : G.flippedThisTurn
-      ? 'Keep playing cards if you like, then end your turn (you draw 1 Action card).'
+      ? (G.actionDeck.size ? 'Keep playing cards if you like, then end your turn (you draw 1 Action card).'
+                           : 'Keep playing cards if you like, then end your turn. The Action deck is empty, so there’s no draw.')
       : 'Play any cards you want, then flip a Whoopsies. Tap a card to read it.';
   if (p.frozenThisTurn) sub = `❄️ Franky Ice froze you: only 1 Action card this turn${G.actionsThisTurn ? ' (used)' : ''}. ` + sub;
   $('panel-sub').textContent = sub;
@@ -1066,7 +1069,7 @@ function renderMain() {
   btns.innerHTML = '';
   if (NET.isHost ? p.id === NET.localIdx : viewerIdx === p.id) {
     if (p.table.length) btns.appendChild(btnEl(`⚠️ Face a Whoopsies from your table (${p.table.length})`, 'btn-red btn-big', onFaceTable));
-    else if (G.flippedThisTurn) btns.appendChild(btnEl('✋ End turn (draw 1)', 'btn-green btn-big', onEndTurn));
+    else if (G.flippedThisTurn) btns.appendChild(btnEl(G.actionDeck.size ? '✋ End turn (draw 1)' : '✋ End turn', 'btn-green btn-big', onEndTurn));
     else btns.appendChild(btnEl('⚠️ Flip a Whoopsies!', 'btn-red btn-big', onFlip));
     const a = p.character;
     if (a.timing === TIMING.YOUR_TURN && a.id !== 'c_casey') {
@@ -1143,6 +1146,8 @@ async function endTurn() {
         renderAll();
         await info('You drew…', `${c.name} goes into your hand.`, { kicker: 'End of turn', cards: [{ card: c }], who: p, auto: 2600 });
       }
+    } else {
+      G.addLog(`${p.name} ends their turn (the Action deck is empty, so no draw).`);
     }
   }
   const before = G.extraTurns.length;
@@ -1174,6 +1179,8 @@ function canPlayOnTurn(p, c) {
         ? { ok: true } : { ok: false, reason: 'Nobody else has cards to take.' };
     case 'a_recover':
       return G.actionDeck.discardSize ? { ok: true } : { ok: false, reason: 'The discard pile is empty.' };
+    case 'a_draw2':
+      return G.actionDeck.size ? { ok: true } : { ok: false, reason: 'The Action deck is empty. There’s nothing left to draw.' };
     default: return { ok: true };
   }
 }
@@ -1303,7 +1310,7 @@ const EFFECTS = {
   async a_draw2(p) {
     const cards = G.actionDeck.drawMany(2);
     p.hand.push(...cards);
-    G.addLog(`${p.name} draws ${cards.length} cards.`);
+    G.addLog(cards.length ? `${p.name} draws ${cards.length} card${cards.length > 1 ? 's' : ''}.` : `The Action deck is empty: ${p.name} draws nothing.`);
     SFX.flip();
   },
 
@@ -1695,6 +1702,7 @@ async function doReaction(reactor, choice) {
 async function caseyCheck(p) {
   if (G.winner || p.isEliminated) return;
   if (p.character.id !== 'c_casey' || !p.canUseAbility() || p.id !== G.currentPlayerIdx) return;
+  if (!G.actionDeck.size) return;   // nothing left to draw
   const yes = p.isBot || await yesNo('Cautious Casey', `${p.name}, draw 1 Action card? (${p.abilitiesLeft} uses left)`,
                           'Draw!', 'Save it', { cards: [{ card: p.character }], who: p });
   if (!yes) return;
@@ -1948,6 +1956,7 @@ function showRules() {
         <li><b>Cancel</b> can stop any Action card, and Cancels stack: Cancel the Cancel, and so on. The game asks automatically.</li>
         <li><b>Redirects stack:</b> whoever a Whoopsies gets redirected to can Redirect it again.</li>
         <li><b>Only the player whose turn it is flips a Whoopsies.</b> Everyone else waits for their turn.</li>
+        <li><b>Decks:</b> when the Action deck runs out, nobody draws Action cards any more. When the Whoopsies deck runs out, it's reset (shuffled back in).</li>
         <li><b>About to lose a life?</b> You'll be offered Not Today! (if a Whoopsies is hitting you) and Second Chance to keep it.</li>
         <li><b>Everyone has a table.</b> A Whoopsies sent to you (Redirect, Slip Away, the bear, Out of Luck!!, Fester) lands face-up on your table and waits for <b>your turn</b>. On your turn you face those first, then flip your own. A table holds at most 2.</li>
         <li><b>Not Today!</b> can be played at any time, even right before a Whoopsies takes your life.</li>

@@ -50,13 +50,14 @@ class SoundManager {
       this.#clips[name] = { el, buf: null };
     }
 
-    // Phones: pause audio while the game is in the background and wake
-    // it up again when you come back (iOS can leave it stuck silent).
-    document.addEventListener('visibilitychange', () => {
-      if (!this.#ctx) return;
-      if (document.hidden) this.#ctx.suspend().catch(() => {});
-      else this.#ctx.resume().catch(() => {});
-    });
+    // Sound keeps playing when the tab is minimized. If the browser or
+    // phone paused it anyway, wake it up as soon as you come back.
+    const wake = () => {
+      if (this.#ctx && this.#ctx.state !== 'running' && !document.hidden) this.#ctx.resume().catch(() => {});
+    };
+    document.addEventListener('visibilitychange', wake);
+    window.addEventListener('focus', wake);
+    window.addEventListener('pageshow', wake);
   }
 
   #load(key, fallback) {
@@ -128,7 +129,14 @@ class SoundManager {
 
   #schedule() {
     const eighth = 60 / SoundManager.BPM / 2;
-    while (this.#nextNoteTime < this.#ctx.currentTime + 0.12) {
+    const now = this.#ctx.currentTime;
+    // If we fell behind (tab was asleep), skip ahead instead of
+    // blasting every missed note at once.
+    if (this.#nextNoteTime < now - 0.25) this.#nextNoteTime = now + 0.05;
+    // Background tabs only get ~1 timer tick per second, so plan the
+    // music further ahead while minimized to keep it smooth.
+    const ahead = document.hidden ? 1.6 : 0.12;
+    while (this.#nextNoteTime < now + ahead) {
       this.#playStep(this.#step, this.#nextNoteTime, eighth);
       this.#nextNoteTime += eighth;
       this.#step = (this.#step + 1) % (SoundManager.PROGRESSION.length * 8);

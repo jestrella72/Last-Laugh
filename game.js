@@ -24,7 +24,11 @@ class Deck {
   #cards     = [];   // private — nobody outside touches this
   #discarded = [];
 
-  constructor(cardDefinitions) {
+  // reshuffle: when the draw pile runs out, shuffle the discards back in?
+  // onReshuffle: optional callback so the game can announce it.
+  constructor(cardDefinitions, { reshuffle = true } = {}) {
+    this.reshuffle   = reshuffle;
+    this.onReshuffle = null;
     // Expand every card definition into (copies) instances.
     // Object.create keeps the class methods/getters (canPlayAnytime…)
     // while giving every copy its own instanceId.
@@ -47,13 +51,15 @@ class Deck {
     }
   }
 
-  // Take the top card. When the draw pile runs out, the discard
-  // pile is shuffled back in. Returns null only if both are empty.
+  // Take the top card. Returns null when the draw pile is empty.
+  // A deck with reshuffle on (the Whoopsies deck) resets itself first:
+  // its discard pile is shuffled back in.
   draw() {
-    if (this.#cards.length === 0 && this.#discarded.length > 0) {
+    if (this.#cards.length === 0 && this.reshuffle && this.#discarded.length > 0) {
       this.#cards     = this.#discarded;
       this.#discarded = [];
       this.shuffle();
+      this.onReshuffle?.();
     }
     return this.#cards.shift() ?? null;
   }
@@ -188,8 +194,12 @@ class Game {
     );
 
     // Build decks  (composition: Game HAS decks)
-    this.whoopsiesDeck = new Deck(WHOOPSIES_CARDS);
-    this.actionDeck    = new Deck(ACTION_CARDS);
+    // The Whoopsies deck resets when it runs out; the Action deck doesn't —
+    // once it's empty, nobody draws Action cards any more.
+    this.whoopsiesDeck = new Deck(WHOOPSIES_CARDS, { reshuffle: true });
+    this.actionDeck    = new Deck(ACTION_CARDS,    { reshuffle: false });
+    this.whoopsiesDeck.onReshuffle = () =>
+      this.addLog('🔄 The Whoopsies deck ran out and was reset (shuffled back in)!', 'turn');
 
     // Turn state
     this.currentPlayerIdx = 0;

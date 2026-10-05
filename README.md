@@ -68,6 +68,8 @@ Good to know:
 
 **End of turn:** you draw 1 Action card and the game shows you which one (only you see it).
 
+**Running out of cards:** when the **Action deck** runs out, it is *not* reshuffled: nobody draws Action cards any more (ending your turn draws nothing, Draw 2 can't be played). When the **Whoopsies deck** runs out, it's reset: the used Whoopsies are shuffled back in.
+
 **Out of Luck!!** on a 5–6 goes to the table of the player on your left or right, and they roll for it on their turn.
 
 **Cancel** can stop any Action card, and Cancels stack (Cancel the Cancel, and so on). **Redirects stack** too: whoever a Whoopsies is redirected to can Redirect it again. **Not Today!** can be played at any time, even right before a Whoopsies takes your life. The game asks automatically whenever someone plays a card. **Drove wearing sunglasses at night** can only be stopped by Slip Away or Redirect.

@@ -555,7 +555,8 @@ const NET = {
     $('panel-title').textContent = me.isEliminated ? '💀 You\'re out' : myTurn ? '🎉 Your turn!' : cur.isBot ? `🤖 ${cur.name} is playing…` : `⏳ ${cur.name}'s turn`;
     $('panel-sub').textContent = me.isEliminated ? 'Stick around and watch who gets the Last Laugh.'
       : myTurn ? (me.table.length ? `You have ${me.table.length} Whoopsies waiting on your table. Face ${me.table.length > 1 ? 'them' : 'it'} first, then flip your own.`
-                  : s.flipped ? 'Keep playing cards if you like, then end your turn (you draw 1 Action card).'
+                  : s.flipped ? (s.aLeft ? 'Keep playing cards if you like, then end your turn (you draw 1 Action card).'
+                                         : 'Keep playing cards if you like, then end your turn. The Action deck is empty, so there’s no draw.')
                   : 'Play any cards you want, then flip a Whoopsies. Tap a card to read it.')
       : 'Your reaction cards pop up when you can use them. Tap a card to read it.';
 
@@ -565,7 +566,7 @@ const NET = {
       const main = me.table.length
         ? btnEl(`⚠️ Face a Whoopsies from your table (${me.table.length})`, 'btn-red btn-big', () => this.send({ t: 'act', a: 'face' }))
         : s.flipped
-          ? btnEl('✋ End turn (draw 1)', 'btn-green btn-big', () => this.send({ t: 'act', a: 'end' }))
+          ? btnEl(s.aLeft ? '✋ End turn (draw 1)' : '✋ End turn', 'btn-green btn-big', () => this.send({ t: 'act', a: 'end' }))
           : btnEl('⚠️ Flip a Whoopsies!', 'btn-red btn-big', () => this.send({ t: 'act', a: 'flip' }));
       main.disabled = s.busy;
       btns.appendChild(main);
