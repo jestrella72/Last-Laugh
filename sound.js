@@ -17,7 +17,7 @@ class SoundManager {
 
   // Recorded sound clips. Each is decoded into Web Audio once sound is
   // unlocked (so it plays on iPhones any time), with <audio> as a fallback.
-  static CLIPS = { fahhh: 'sounds/fahhh.mp3', nope: 'sounds/nope.mp3', wow: 'sounds/wow.mp3' };
+  static CLIPS = { fahhh: 'sounds/fahhh.mp3', nope: 'sounds/nope.mp3', wow: 'sounds/wow.mp3', sax: 'sounds/sax.mp3' };
   #clips = {};   // name → { el: <audio>, buf: AudioBuffer | null }
 
   static BPM = 168;
@@ -255,7 +255,8 @@ class SoundManager {
   }
 
   // Play a recorded clip. The music dips while it plays so it really lands.
-  #playClip(name, duckSeconds) {
+  // maxSeconds (optional) stops the clip early with a quick fade-out.
+  #playClip(name, duckSeconds, maxSeconds = 0) {
     if (!this.sfxOn || this.quiet) return;
     const clip = this.#clips[name];
     if (this.#music) {
@@ -265,22 +266,31 @@ class SoundManager {
       g.setTargetAtTime(0.16, t + duckSeconds, 0.3);
     }
     if (clip.buf && this.#ctx) {
+      const t = this.#ctx.currentTime;
       const src = this.#ctx.createBufferSource();
+      const g = this.#ctx.createGain();
       src.buffer = clip.buf;
-      src.connect(this.#master);
-      src.start();
+      src.connect(g).connect(this.#master);
+      src.start(t);
+      if (maxSeconds) {   // (stop can only be scheduled after start)
+        g.gain.setValueAtTime(1, t + maxSeconds - 0.25);
+        g.gain.linearRampToValueAtTime(0.0001, t + maxSeconds);
+        src.stop(t + maxSeconds + 0.05);
+      }
       return;
     }
     try {
       clip.el.currentTime = 0;
       const p = clip.el.play();
       if (p) p.catch(() => {});
+      if (maxSeconds) setTimeout(() => clip.el.pause(), maxSeconds * 1000);
     } catch {}
   }
 
   fahhh() { this.#playClip('fahhh', 1.6); }   // life lost / Whoopsies sent to you
   nope()  { this.#playClip('nope', 0.9); }    // someone played Cancel
   wow()   { this.#playClip('wow', 1.4); }     // someone gained a life
+  sax()   { this.#playClip('sax', 3, 3); }    // Take 1 / Swap Hands (3 seconds max)
 }
 
 const SFX = new SoundManager();

@@ -89,6 +89,7 @@ Card counts are set in `cards.js`. Change the `copies` number to rebalance.
 - **Redirect alert:** when a Whoopsies is pushed onto you (Redirect, Slip Away, the bear, Out of Luck!!, Fester), a shocked face pops up: "This is being REDIRECTED to you!" with the FAHHH sound.
 - **Losing a life** plays FAHHH with a heart-break flash.
 - **Slip Away** plays the FAHHH for everyone at the table.
+- **Take 1** and **Swap Hands** play 3 seconds of sneaky saxophone 🎷 for everyone.
 - **NOPE!** Whenever someone plays Cancel or Not Today!, every screen shows a pop-up with the "no" sound.
 - **WOW!** Whenever someone gains (or keeps) a life with Second Chance, every screen shows a WOW! pop-up with the wow sound.
 - **Table Talk:** a text box beside the table. Pick who's talking, type, or tap a quick line. Messages also pop up as speech bubbles over that player.

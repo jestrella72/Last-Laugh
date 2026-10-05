@@ -1319,6 +1319,7 @@ const EFFECTS = {
     if (!targets.length) { await info('Take 1', 'Nobody has any cards to take.'); return; }
     const t = await pickPlayer('Take 1', 'Take a random Action card from who?', targets, { kicker: p.name, who: p, purpose: 'cards' });
     if (await luckyLukeBlocks(t, 'Take 1')) return;
+    SFX.sax();
     const stolen = t.stealRandomCard();
     p.hand.push(stolen);
     G.addLog(`🫳 ${p.name} takes a card from ${t.name}!`);
@@ -1330,6 +1331,7 @@ const EFFECTS = {
     const t = await pickPlayer('Swap Hands', 'Swap your whole hand with…', targets, { kicker: p.name, cancel: 'Don\'t swap', who: p, purpose: 'cards' });
     if (!t) return;
     if (await luckyLukeBlocks(t, 'Swap Hands')) return;
+    SFX.sax();
     [p.hand, t.hand] = [t.hand, p.hand];
     G.addLog(`🔄 ${p.name} swaps hands with ${t.name}!`);
     toast(`${p.name} and ${t.name} swap hands!`);
