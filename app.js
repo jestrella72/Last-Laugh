@@ -29,6 +29,15 @@ for (const ev of ['pointerdown', 'touchend', 'click', 'keydown']) {
 
 const botTurn = () => G && G.currentPlayer.isBot;
 
+// How long bots pause before doing things, so people can follow along.
+const BOT_PACE = { step: 1600, think: 1500, popup: 2600, dice: 2600, reveal: 3000 };
+
+// A bot "thinks" for a moment (with a little note on screen) before acting
+async function botThink(bot, what) {
+  toast(`🤔 ${bot.name} ${what}…`);
+  await sleep(BOT_PACE.think);
+}
+
 // Bots post in Table Talk now and then
 function botSay(bot, kind, chance = .5) {
   if (bot.isBot && Math.random() < chance) setTimeout(() => sendChat(Bot.line(kind), bot), 700);
@@ -148,7 +157,7 @@ function askLocal({ title, kicker = '', body = '', html = '', cards = [], player
 
     // While a bot is playing, plain "OK" pop-ups close by themselves
     const passive = buttons.length <= 1 && !players.length && !cards.some(c => c.value !== undefined);
-    const autoMs  = auto ?? (botTurn() && passive ? 1700 : 0);
+    const autoMs  = auto ?? (botTurn() && passive ? BOT_PACE.popup : 0);
     if (autoMs) {
       const started = Date.now();
       const tick = () => {
@@ -347,7 +356,7 @@ function revealWhoopsies(card, target) {
     const close = () => { if (closed) return; closed = true; s.classList.remove('open'); resolve(); };
     $('reveal-btn').onclick = close;
     if (NET.on) setTimeout(close, 2600);
-    else if (target.isBot) setTimeout(close, 2300);
+    else if (target.isBot) setTimeout(close, BOT_PACE.reveal);
   });
 }
 
@@ -512,12 +521,13 @@ async function diceAnimation(value, caption, auto = null) {
 // Roll a die for someone. Any Melo Mel at the table may re-roll it.
 async function roll(player, reason) {
   let value = Game.rollDie();
-  await diceAnimation(value, `${player.name} — ${reason}`, player.isBot ? 1900 : null);
+  await diceAnimation(value, `${player.name} — ${reason}`, player.isBot ? BOT_PACE.dice : null);
   G.addLog(`🎲 ${player.name} rolled a ${value} (${reason}).`);
   for (;;) {
     const allMels = G.activePlayers.filter(p => p.character.id === 'c_mel' && p.canUseAbility());
     const botMel  = allMels.find(m => m.isBot && Bot.wantsReroll(m, player, value, reason));
     if (botMel) {
+      await botThink(botMel, 'wants a re-roll');
       botMel.useAbility();
       value = Game.rollDie();
       G.addLog(`🎵 ${botMel.name} (Melo Mel) re-rolls… ${value}!`);
@@ -979,7 +989,7 @@ async function startTurn() {
 
 // A bot's whole turn: play a few cards, maybe use its ability, flip.
 async function runBotTurn(p) {
-  await sleep(900);
+  await sleep(BOT_PACE.step);
   const fresh = !G.flippedThisTurn && !G.actionsThisTurn;   // false if taking over mid-turn
   for (let i = 0; i < 2 && fresh && !G.winner; i++) {
     const card = Bot.chooseTurnCard(p);
@@ -987,7 +997,7 @@ async function runBotTurn(p) {
     const res = await playAction(p, card);
     renderAll();
     if (res === 'end_turn') return endTurn();
-    await sleep(800);
+    await sleep(BOT_PACE.step);
   }
   if (fresh && Bot.wantsAbility(p)) {
     p.useAbility();
@@ -996,15 +1006,17 @@ async function runBotTurn(p) {
     renderAll();
     await ABILITIES[p.character.id](p);
     renderAll();
-    await sleep(800);
+    await sleep(BOT_PACE.step);
   }
   // First the Whoopsies waiting on its table, then its own flip
   while (p.table.length && !p.isEliminated && !G.winner) {
     const e = p.table.shift();
     await faceWhoopsies(e.card, p.id, { passedBear: e.passedBear });
-    await sleep(500);
+    await sleep(BOT_PACE.step);
   }
   if (!G.flippedThisTurn && !p.isEliminated && !G.winner) {
+    toast(`🤔 ${p.name} is about to flip a Whoopsies…`);
+    await sleep(BOT_PACE.think);
     G.flippedThisTurn = true;
     await faceWhoopsies(G.whoopsiesDeck.draw(), p.id);
   }
@@ -1013,12 +1025,12 @@ async function runBotTurn(p) {
 
 async function botFinishTurn(p) {
   if (!p.isEliminated && !G.winner) {
-    await sleep(700);
+    await sleep(BOT_PACE.step);
     const card = Bot.chooseTurnCard(p);
     if (card && ['a_second_chance', 'a_draw2', 'a_take1'].includes(card.id)) {
       const res = await playAction(p, card);
       renderAll();
-      if (res !== 'end_turn') await sleep(700);
+      if (res !== 'end_turn') await sleep(BOT_PACE.step);
     }
   }
   return endTurn();
@@ -1237,6 +1249,7 @@ async function cancelWindow(player, card) {
   const holders = G.activePlayers.filter(p => p.id !== player.id && p.hasCard('a_cancel'));
   if (!holders.length) return true;
   let v = holders.find(h => h.isBot && Bot.wantsCancel(h, player, card))?.id ?? -1;
+  if (v !== -1) await botThink(G.players[v], 'is reaching for a card');
   const humanHolders = holders.filter(h => !h.isBot);
   if (v === -1 && humanHolders.length && NET.on) {
     const c = await firstYes(humanHolders, () => ({
@@ -1275,7 +1288,7 @@ async function rickCopy(player, card) {
   const ricks = G.activePlayers.filter(r => r.id !== player.id && r.character.id === 'c_rick' && r.canUseAbility());
   for (const r of ricks) {
     if (card.id === 'a_second_chance' && r.lives >= r.maxLives) continue;
-    const yes = r.isBot ? Bot.wantsCopy(card) : await yesNo('Slick Rick 🎩', `${r.name}, use ${card.name}'s effect for yourself too? (${r.abilitiesLeft} uses left)`,
+    const yes = r.isBot ? (Bot.wantsCopy(card) && (await botThink(r, 'is sneaking a copy'), true)) : await yesNo('Slick Rick 🎩', `${r.name}, use ${card.name}'s effect for yourself too? (${r.abilitiesLeft} uses left)`,
                             'Copy it!', 'No thanks', { kicker: 'Reaction', cards: [{ card: r.character }], who: r });
     if (!yes) continue;
     r.useAbility();
@@ -1554,7 +1567,7 @@ async function reactionWindow() {
       const choice = Bot.reaction(b);
       if (!choice) continue;
       botReacted = true;
-      await sleep(500);
+      await botThink(b, 'is reacting');
       const r = await doReaction(b, choice);
       if (G.sentAway) return 'sent';
       if (r === 'negated' || r === 'avoided') return r;
