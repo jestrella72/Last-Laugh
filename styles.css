@@ -819,3 +819,6 @@ input, select { font-size: 16px !important; }   /* stops iPhone zooming into inp
 .story-level.boss { border-color: var(--red); box-shadow: 3px 3px 0 var(--red); }
 .story-level.boss.next { background: #ffd9dc; }
 .story-taunt { font-family: var(--display); font-size: 1.25rem; color: var(--red); }
+
+/* NOT TODAY! (rizzbot laugh) */
+#pop-screen.pop-laugh { background: radial-gradient(circle, rgba(255, 216, 77, .92), rgba(34, 179, 94, .88)); }

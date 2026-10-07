@@ -17,7 +17,8 @@ class SoundManager {
 
   // Recorded sound clips. Each is decoded into Web Audio once sound is
   // unlocked (so it plays on iPhones any time), with <audio> as a fallback.
-  static CLIPS = { fahhh: 'sounds/fahhh.mp3', nope: 'sounds/nope.mp3', wow: 'sounds/wow.mp3', sax: 'sounds/sax.mp3' };
+  static CLIPS = { fahhh: 'sounds/fahhh.mp3', nope: 'sounds/nope.mp3', wow: 'sounds/wow.mp3', sax: 'sounds/sax.mp3',
+                    damage: 'sounds/damage.mp3', laugh: 'sounds/laugh.mp3' };
   #clips = {};   // name → { el: <audio>, buf: AudioBuffer | null }
 
   static BPM = 168;
@@ -288,9 +289,11 @@ class SoundManager {
   }
 
   fahhh() { this.#playClip('fahhh', 1.6); }   // life lost / Whoopsies sent to you
-  nope()  { this.#playClip('nope', 0.9); }    // someone played Cancel
+  nope()  { this.#playClip('nope', 0.9); }    // someone played Cancel (only Cancel)
   wow()   { this.#playClip('wow', 1.4); }     // someone gained a life
-  sax()   { this.#playClip('sax', 3, 3); }    // Take 1 / Swap Hands (3 seconds max)
+  sax()   { this.#playClip('sax', 3, 3); }    // Swap Hands (3 seconds max)
+  damage(){ this.#playClip('damage', 3.4); }  // Take 1: "emotional damage"
+  laugh() { this.#playClip('laugh', 2.4); }   // Not Today!
 }
 
 const SFX = new SoundManager();

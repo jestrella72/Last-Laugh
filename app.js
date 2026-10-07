@@ -461,8 +461,9 @@ async function hurt(player, opts = {}) {
 // Shows on every screen, with its sound, and closes by itself.
 function popOverlay(kind, title, sub, ms = 1900) {
   if (NET.isHost) NET.broadcast({ t: 'pop', kind, title, sub });
-  if (kind === 'nope') SFX.nope();
-  if (kind === 'wow') SFX.wow();
+  if (kind === 'nope') SFX.nope();     // Cancel
+  if (kind === 'laugh') SFX.laugh();   // Not Today!
+  if (kind === 'wow') SFX.wow();       // a life gained
   return new Promise(resolve => {
     const s = $('pop-screen');
     s.className = `overlay pop-${kind}`;
@@ -1303,7 +1304,7 @@ async function rickCopy(player, card) {
     r.useAbility();
     G.addLog(`🎩 ${r.name} (Slick Rick) copies ${card.name}!`);
     renderAll();
-    if (['a_peek', 'a_recover'].includes(card.id)) await passTo(r, `Slick Rick copies ${card.name}. Peek privately!`);
+    if (['a_peek', 'a_recover', 'a_draw2'].includes(card.id)) await passTo(r, `Slick Rick copies ${card.name}. Peek privately!`);
     await EFFECTS[card.id](r, { copy: true });
     renderAll();
   }
@@ -1334,6 +1335,11 @@ const EFFECTS = {
     p.hand.push(...cards);
     G.addLog(cards.length ? `${p.name} draws ${cards.length} card${cards.length > 1 ? 's' : ''}.` : `The Action deck is empty: ${p.name} draws nothing.`);
     SFX.flip();
+    if (cards.length && !p.isBot) {   // only the player who drew them sees them
+      renderAll();
+      await info('You drew…', cards.map(c => c.name).join(' and ') + (cards.length > 1 ? ' go into your hand.' : ' goes into your hand.'),
+                 { kicker: 'Draw 2', cards: cards.map(c => ({ card: c })), who: p, auto: 3200 });
+    }
   },
 
   async a_take1(p) {
@@ -1341,7 +1347,7 @@ const EFFECTS = {
     if (!targets.length) { await info('Take 1', 'Nobody has any cards to take.'); return; }
     const t = await pickPlayer('Take 1', 'Take a random Action card from who?', targets, { kicker: p.name, who: p, purpose: 'cards' });
     if (await luckyLukeBlocks(t, 'Take 1')) return;
-    SFX.sax();
+    SFX.damage();
     const stolen = t.stealRandomCard();
     p.hand.push(stolen);
     G.addLog(`🫳 ${p.name} takes a card from ${t.name}!`);
@@ -1418,7 +1424,7 @@ const EFFECTS = {
     G.addLog(`🛑 NOT TODAY! ${p.name} shrugs off "${G.currentWhoopsies.name}".`);
     botSay(p, 'dodge');
     renderAll();
-    await popOverlay('nope', 'NOT TODAY!', `${p.name} stops "${G.currentWhoopsies.name}" cold!`);
+    await popOverlay('laugh', 'NOT TODAY!', `${p.name} stops "${G.currentWhoopsies.name}" cold!`);
     return 'negated';
   },
 
@@ -1426,7 +1432,8 @@ const EFFECTS = {
     const others = G.activePlayers.filter(o => o.id !== G.whoopsiesTargetIdx && G.canReceive(o));
     const t = await pickPlayer('Redirect', 'Who faces this Whoopsies instead?', others, { kicker: p.name, who: p });
     botSay(p, 'redirect');
-    await redirectTo(t.id, `${p.name} played Redirect`);
+    SFX.fahhh();   // everyone hears it (online it's echoed to every phone)
+    await redirectTo(t.id, `${p.name} played Redirect`, { sound: false });
   },
 
   async a_slip(p) {

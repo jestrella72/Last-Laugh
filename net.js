@@ -290,7 +290,7 @@ const NET = {
   wrapSounds() {
     if (this._wrapped) return;
     this._wrapped = true;
-    for (const name of ['flip', 'play', 'dice', 'coin', 'good', 'fanfare', 'fahhh', 'nope', 'wow', 'sax']) {
+    for (const name of ['flip', 'play', 'dice', 'coin', 'good', 'fanfare', 'fahhh', 'nope', 'wow', 'sax', 'damage', 'laugh']) {
       const orig = SFX[name].bind(SFX);
       SFX[name] = (...a) => {
         orig(...a);
