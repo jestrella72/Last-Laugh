@@ -21,7 +21,7 @@ Then open http://localhost:8090.
 Tap **🏆 Story mode**, pick your hero, and beat every other character in **1-on-1 duels**, easiest first:
 Naive Nina → Cautious Casey → Bold Bella → Curious Carl → Melo Mel → Prankster Pete → Lucky Luke → Reckless Rosie → Franky Ice → Grumpy Lou → Slick Rick → **👑 final boss: Fester the Cat** (if you play as Fester, Slick Rick is the boss).
 
-Each level gets harder: the bot plays smarter, has more lives (2 → 3), and later starts with bonus cards and extra ability uses. The final boss has 4 lives, 4 bonus cards, 2 extra ability uses and plays perfectly. Your progress is saved on your device, and you can retry any level as often as you like (🏳️ leaves a duel).
+Each level gets harder: the bot plays smarter, has more lives (2 → 3), and later starts with bonus cards and extra ability uses. The final boss has 4 lives, 4 bonus cards, 2 extra ability uses and plays perfectly. Your progress is saved on your device. **Lose a duel and you get one more try; lose again and the story starts over from level 1** (same hero). Beating a level gives you a fresh retry for the next one. Leaving a duel with 🏳️ counts as a loss.
 
 ### 🌐 Playing online (everyone on their own phone)
 

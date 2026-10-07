@@ -5,6 +5,8 @@
 //  easiest first. Each level is harder (smarter bot, more lives,
 //  bonus cards). The final boss is Fester the Cat, the card shark.
 //  Progress is saved on this device so you can continue later.
+//  Lose a duel and you get ONE more try at it; lose again and the
+//  story starts over from level 1 (same hero).
 //
 //  OOP LESSON: STORY is another singleton object. It only *configures*
 //  a normal Game (lives, cards, how smart the bot is); the rules
@@ -89,7 +91,7 @@ const STORY = {
 
   begin(name, hero) {
     try { localStorage.setItem('ll-name', name); } catch {}
-    const prog = { name, heroId: hero.id, level: 0, done: false };
+    const prog = { name, heroId: hero.id, level: 0, done: false, lastChance: false };
     this.save(prog);
     this.renderMap(prog);
   },
@@ -102,7 +104,7 @@ const STORY = {
     const levels = this.ladder(prog.heroId);
     $('story-sub').textContent = prog.done
       ? `🏆 ${prog.name} beat everyone as ${hero.name} and got the Last Laugh!`
-      : `${prog.name} as ${hero.name} · Level ${prog.level + 1} of ${levels.length}`;
+      : `${prog.name} as ${hero.name} · Level ${prog.level + 1} of ${levels.length}${prog.lastChance ? ' · ⚠️ LAST CHANCE: lose again and the story starts over!' : ''}`;
 
     const list = $('story-ladder');
     list.innerHTML = '';
@@ -131,7 +133,8 @@ const STORY = {
     }));
     if (!prog.done) {
       const lv = levels[prog.level];
-      acts.appendChild(btnEl(`▶ Level ${prog.level + 1}: ${lv.opp.name}`, 'btn-yellow btn-big', () => this.intro(prog, prog.level)));
+      acts.appendChild(btnEl(`${prog.lastChance ? '⚠️ Last chance · ' : '▶ '}Level ${prog.level + 1}: ${lv.opp.name}`,
+                             prog.lastChance ? 'btn-red btn-big' : 'btn-yellow btn-big', () => this.intro(prog, prog.level)));
     }
   },
 
@@ -142,7 +145,8 @@ const STORY = {
       title: lv.opp.name, single: true,
       cards: [{ card: lv.opp }],
       html: `<p class="story-taunt">“${esc(STORY_TAUNTS[lv.opp.id])}”</p>
-             <p>${esc(lv.opp.name)} has <b>${lv.botLives} lives</b>${lv.bonusCards ? `, <b>+${lv.bonusCards} bonus cards</b>` : ''}${lv.bonusUses ? `, <b>+${lv.bonusUses} ability uses</b>` : ''}. You have 3 lives.</p>`,
+             <p>${esc(lv.opp.name)} has <b>${lv.botLives} lives</b>${lv.bonusCards ? `, <b>+${lv.bonusCards} bonus cards</b>` : ''}${lv.bonusUses ? `, <b>+${lv.bonusUses} ability uses</b>` : ''}. You have 3 lives.</p>
+             ${prog.lastChance ? '<p class="story-warning">⚠️ LAST CHANCE! Lose this one and the story starts over from level 1.</p>' : ''}`,
       buttons: [{ label: lv.boss ? '😈 Face the boss!' : '🥊 Fight!', cls: 'btn-red btn-big', value: true },
                 { label: 'Not yet', cls: 'btn-plain', value: false }],
     });
@@ -193,8 +197,9 @@ const STORY = {
       if (this.level >= prog.level) {
         prog.level = Math.min(this.level + 1, levels.length - 1);
         if (last) prog.done = true;
-        this.save(prog);
       }
+      prog.lastChance = false;   // a fresh retry for the next level
+      this.save(prog);
       if (last) {
         showWinner(true);
         $('winner-title').textContent = '🏆 YOU GOT THE LAST LAUGH!';
@@ -213,16 +218,43 @@ const STORY = {
       this.leaveGame();
       if (v === 'next') this.intro(prog, prog.level); else this.renderMap(prog);
     } else {
+      await this.lost(prog, levels);
+    }
+  },
+
+  // Lost a duel: the first loss on a level leaves one more try,
+  // the second loss resets the story to level 1.
+  async lost(prog, levels, quit = false) {
+    const opp = levels[this.level].opp;
+    const why = quit ? 'You left the duel, so it counts as a loss.' : '';
+    if (!prog.lastChance) {
+      prog.lastChance = true;
+      this.save(prog);
       const v = await askLocal({
-        kicker: '💀 Defeated', title: `${levels[this.level].opp.name} got the Last Laugh…`,
-        cards: [{ card: levels[this.level].opp }], single: true,
-        body: 'Shake it off and try again!',
-        buttons: [{ label: '🔁 Try again', cls: 'btn-yellow btn-big', value: 'retry' },
+        kicker: '💀 Defeated', title: `${opp.name} got the Last Laugh…`,
+        cards: [{ card: opp }], single: true,
+        html: `${why ? `<p>${why}</p>` : ''}<p class="story-warning">⚠️ You have ONE more try. Lose again and the story starts over from level 1!</p>`,
+        buttons: [{ label: '🔁 Last chance: try again', cls: 'btn-red btn-big', value: 'retry' },
                   { label: 'Story map', cls: 'btn-plain', value: 'map' }],
       });
       this.leaveGame();
       if (v === 'retry') this.play(prog, this.level); else this.renderMap(prog);
+      return;
     }
+    // Second loss: game over, back to level 1 with the same hero
+    prog.level = 0;
+    prog.lastChance = false;
+    prog.done = false;
+    this.save(prog);
+    SFX.fahhh();
+    await askLocal({
+      kicker: '☠️ GAME OVER', title: `${opp.name} beat you twice!`,
+      cards: [{ card: opp }], single: true,
+      html: `${why ? `<p>${why}</p>` : ''}<p>The Last Laugh Tour starts over from <b>level 1</b>. Same hero, fresh start. You've got this!</p>`,
+      buttons: [{ label: '🔄 Start the story over', cls: 'btn-yellow btn-big', value: 'ok' }],
+    });
+    this.leaveGame();
+    this.renderMap(prog);
   },
 
   // Back from the table to the setup screen
@@ -240,14 +272,16 @@ const STORY = {
   quit() {
     if (!this.active || !G) return;
     if (busy || G.currentPlayer.isBot) { toast('You can leave on your own turn.'); return; }
-    yesNo('Leave this duel?', 'You can retry this level from the story map.', 'Leave', 'Keep playing', { local: true })
-      .then(ok => {
+    const prog = this.load();
+    const warn = prog.lastChance ? 'Leaving counts as a loss. This is your last chance, so the story would start over from level 1!'
+                                 : 'Leaving counts as a loss (you’d have one try left at this level).';
+    yesNo('Leave this duel?', warn, 'Leave', 'Keep playing', { local: true })
+      .then(async ok => {
         if (!ok) return;
         this.active = false;
         Bot.skill = 1;
         Bot.focusPeople = false;
-        this.leaveGame();
-        this.renderMap(this.load());
+        await this.lost(prog, this.ladder(prog.heroId), true);
       });
   },
 };
