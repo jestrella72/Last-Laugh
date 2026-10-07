@@ -21,26 +21,57 @@ class SoundManager {
                     damage: 'sounds/damage.mp3', laugh: 'sounds/laugh.mp3' };
   #clips = {};   // name → { el: <audio>, buf: AudioBuffer | null }
 
-  static BPM = 168;
-
-  // 16-bar ragtime progression, one chord per bar
-  static PROGRESSION = ['C','C','A7','A7','D7','G7','C','G7',
-                        'C','C7','F','Fm','C','A7','D7','G7'];
-
+  // Chord name → [root MIDI note, intervals]
   static CHORDS = {
     C:  [48, [0, 4, 7, 12]],  C7: [48, [0, 4, 7, 10]],
     F:  [53, [0, 4, 7, 12]],  Fm: [53, [0, 3, 7, 12]],
     G7: [43, [0, 4, 7, 10]],  A7: [45, [0, 4, 7, 10]],
     D7: [50, [0, 4, 7, 10]],
+    Am: [45, [0, 3, 7, 12]],  Dm: [50, [0, 3, 7, 12]],
+    E7: [40, [0, 4, 7, 10]],  Gm: [43, [0, 3, 7, 12]],
+    Bb: [46, [0, 4, 7, 12]],
   };
 
-  // Syncopated melody rhythms: eighth-note slot → chord-tone index
-  static RIFFS = [
-    { 0: 2, 1: 3, 3: 4, 4: 3, 6: 2 },
-    { 0: 4, 2: 3, 3: 2, 5: 1, 6: 2 },
-    { 1: 1, 2: 2, 3: 3, 4: 4, 6: 5 },
-    { 0: 5, 1: 4, 3: 3, 4: 2, 7: 1 },
-  ];
+  // Three soundtracks, all made from the same few instruments.
+  //   progression: one chord per bar (8 eighth-notes per bar)
+  //   riffs:       eighth-note slot → chord-tone index for the melody
+  static TRACKS = {
+    // Menus: a bouncy ragtime piano
+    menu: {
+      bpm: 168, bass: 'stride', lead: 'piano', drums: 'brush', leadLen: 1.6,
+      progression: ['C','C','A7','A7','D7','G7','C','G7', 'C','C7','F','Fm','C','A7','D7','G7'],
+      riffs: [
+        { 0: 2, 1: 3, 3: 4, 4: 3, 6: 2 },
+        { 0: 4, 2: 3, 3: 2, 5: 1, 6: 2 },
+        { 1: 1, 2: 2, 3: 3, 4: 4, 6: 5 },
+        { 0: 5, 1: 4, 3: 3, 4: 2, 7: 1 },
+      ],
+    },
+    // Matches: a sneaky minor-key "cartoon chase" with a walking bass
+    match: {
+      bpm: 184, bass: 'walk', lead: 'reed', drums: 'tick', leadLen: 0.7,
+      progression: ['Am','Am','Dm','Dm','Am','Am','E7','E7', 'F','F','Dm','E7','Am','Dm','E7','Am'],
+      riffs: [
+        { 0: 0, 1: 2, 2: 4, 4: 3, 5: 2, 6: 1 },
+        { 0: 4, 2: 4, 3: 3, 4: 2, 6: 0 },
+        { 1: 2, 2: 3, 3: 4, 4: 5, 6: 4, 7: 3 },
+        { 0: 5, 2: 3, 4: 1, 6: 0 },
+      ],
+    },
+    // Final boss: a dark, slow tango
+    boss: {
+      bpm: 112, bass: 'habanera', lead: 'reed', drums: 'tango', leadLen: 1.9,
+      progression: ['Dm','Dm','Gm','Dm','A7','A7','Dm','A7', 'Bb','Gm','A7','Dm','Gm','Dm','A7','A7'],
+      riffs: [
+        { 0: 4, 4: 3 },
+        { 0: 2, 2: 3, 4: 4, 6: 5 },
+        { 0: 5, 4: 4, 6: 3 },
+        { 0: 1, 2: 2, 4: 0 },
+      ],
+    },
+  };
+
+  #track = 'menu';
 
   constructor() {
     this.musicOn = this.#load('ll-music', true);
@@ -103,6 +134,16 @@ class SoundManager {
   get fahhhReady() { return !!this.#clips.fahhh.buf; }
 
   // ── Music ───────────────────────────────────────────────
+  // Switch soundtrack ('menu' | 'match' | 'boss'). Starts from the top.
+  setTrack(name) {
+    if (!SoundManager.TRACKS[name] || name === this.#track) return;
+    this.#track = name;
+    this.#step = 0;
+    if (this.#ctx) this.#nextNoteTime = this.#ctx.currentTime + 0.15;
+  }
+
+  get track() { return this.#track; }
+
   startMusic() {
     if (!this.#ctx || this.#timer) return;
     this.#nextNoteTime = this.#ctx.currentTime + 0.1;
@@ -129,7 +170,8 @@ class SoundManager {
   }
 
   #schedule() {
-    const eighth = 60 / SoundManager.BPM / 2;
+    const tr = SoundManager.TRACKS[this.#track];
+    const eighth = 60 / tr.bpm / 2;
     const now = this.#ctx.currentTime;
     // If we fell behind (tab was asleep), skip ahead instead of
     // blasting every missed note at once.
@@ -140,32 +182,87 @@ class SoundManager {
     while (this.#nextNoteTime < now + ahead) {
       this.#playStep(this.#step, this.#nextNoteTime, eighth);
       this.#nextNoteTime += eighth;
-      this.#step = (this.#step + 1) % (SoundManager.PROGRESSION.length * 8);
+      this.#step = (this.#step + 1) % (tr.progression.length * 8);
     }
   }
 
   #playStep(step, t, eighth) {
+    const tr    = SoundManager.TRACKS[this.#track];
     const bar   = Math.floor(step / 8);
     const slot  = step % 8;
-    const [root, shape] = SoundManager.CHORDS[SoundManager.PROGRESSION[bar]];
+    const [root, shape] = SoundManager.CHORDS[tr.progression[bar]];
 
-    // Left hand "stride": low bass on beats 1 & 3, chord stab on 2 & 4
-    if (slot === 0) this.#piano(root - 12, t, 0.35, 0.55);
-    if (slot === 4) this.#piano(root - 12 + 7, t, 0.35, 0.5);
-    if (slot === 2 || slot === 6) {
-      for (const iv of shape.slice(1)) this.#piano(root + iv, t, 0.14, 0.22);
+    // ── Bass / left hand ──
+    if (tr.bass === 'stride') {          // low note on 1 & 3, chord stab on 2 & 4
+      if (slot === 0) this.#piano(root - 12, t, 0.35, 0.55);
+      if (slot === 4) this.#piano(root - 12 + 7, t, 0.35, 0.5);
+      if (slot === 2 || slot === 6) {
+        for (const iv of shape.slice(1)) this.#piano(root + iv, t, 0.14, 0.22);
+      }
+    } else if (tr.bass === 'walk') {     // walking bass on every beat
+      const walk = [0, shape[1], shape[2], shape[1] + 2];
+      if (slot % 2 === 0) this.#piano(root - 12 + walk[slot / 2], t, eighth * 1.5, 0.5);
+      if (slot === 2 || slot === 6) {    // short, quiet chord "chops"
+        for (const iv of shape.slice(1, 3)) this.#piano(root + iv, t, 0.08, 0.13);
+      }
+    } else if (tr.bass === 'habanera') { // tango rhythm: long-short-long-long
+      const hab = { 0: 0, 3: 7, 4: 12, 6: 7 };
+      if (hab[slot] !== undefined) this.#piano(root - 12 + hab[slot], t, eighth * (slot === 0 ? 2.6 : 1.2), 0.55);
+      if (slot === 4) for (const iv of shape.slice(1, 3)) this.#piano(root + iv, t, 0.25, 0.16);
     }
 
-    // Right hand: syncopated riff built from chord tones
-    const riff = SoundManager.RIFFS[bar % SoundManager.RIFFS.length];
+    // ── Melody: riff built from chord tones ──
+    const riff = tr.riffs[bar % tr.riffs.length];
     if (riff[slot] !== undefined) {
       const tones = [...shape, shape[1] + 12, shape[2] + 12];
       const note  = root + 12 + tones[riff[slot]];
-      this.#piano(note, t, eighth * 1.6, 0.32);
+      if (tr.lead === 'reed') this.#reed(note, t, eighth * tr.leadLen, 0.26);
+      else this.#piano(note, t, eighth * tr.leadLen, 0.32);
     }
 
-    // Soft brush on the off-beats
-    if (slot % 2 === 1) this.#noise(t, 0.04, 0.05, 6000, this.#music);
+    // ── Drums ──
+    if (tr.drums === 'brush' && slot % 2 === 1) this.#noise(t, 0.04, 0.05, 6000, this.#music);
+    if (tr.drums === 'tick') {
+      if (slot === 2 || slot === 6) this.#noise(t, 0.05, 0.12, 3500, this.#music);   // rimshot
+      if (slot % 2 === 1) this.#noise(t, 0.025, 0.04, 8000, this.#music);            // hi-hat
+    }
+    if (tr.drums === 'tango') {
+      if (slot === 0 || slot === 4) this.#noise(t, 0.12, 0.35, 140, this.#music);    // low thump
+      if (slot === 6) this.#noise(t, 0.05, 0.1, 3000, this.#music);
+    }
+  }
+
+  // A clarinet-ish reed: square + triangle with a little vibrato
+  #reed(midi, t, dur, vel, dest = this.#music) {
+    const ctx  = this.#ctx;
+    const freq = 440 * Math.pow(2, (midi - 69) / 12);
+    const env  = ctx.createGain();
+    env.gain.setValueAtTime(0.0001, t);
+    env.gain.exponentialRampToValueAtTime(vel, t + 0.03);
+    env.gain.setValueAtTime(vel, t + Math.max(0.04, dur - 0.05));
+    env.gain.exponentialRampToValueAtTime(0.0001, t + dur + 0.08);
+    const lp = ctx.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.value = 1700;
+    env.connect(lp).connect(dest);
+    const lfo = ctx.createOscillator();
+    const depth = ctx.createGain();
+    lfo.frequency.value = 5.5;
+    depth.gain.value = 9;
+    lfo.connect(depth);
+    for (const [type, level] of [['square', 0.16], ['triangle', 0.7]]) {
+      const o = ctx.createOscillator();
+      o.type = type;
+      o.frequency.value = freq;
+      depth.connect(o.detune);
+      const g = ctx.createGain();
+      g.gain.value = level;
+      o.connect(g).connect(env);
+      o.start(t);
+      o.stop(t + dur + 0.12);
+    }
+    lfo.start(t);
+    lfo.stop(t + dur + 0.12);
   }
 
   // A little honky-tonk piano: two slightly detuned voices, fast decay

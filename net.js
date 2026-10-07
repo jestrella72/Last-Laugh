@@ -782,6 +782,7 @@ async function copyRoomLink() {
 }
 
 function enterClientGame() {
+  SFX.setTrack('match');
   $('setup-screen').classList.remove('active');
   $('game-screen').classList.add('active');
   $('chat-speaker').style.display = 'none';

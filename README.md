@@ -102,7 +102,7 @@ Card counts are set in `cards.js`. Change the `copies` number to rebalance.
 - **NOT TODAY!** plays the rizzbot laugh with its own pop-up.
 - **WOW!** Whenever someone gains (or keeps) a life with Second Chance, every screen shows a WOW! pop-up with the wow sound.
 - **Table Talk:** a text box beside the table. Pick who's talking, type, or tap a quick line. Messages also pop up as speech bubbles over that player.
-- **Soundtrack:** a ragtime piano loop generated in the browser (no music file needed). 🎵 toggles music, 🔊 toggles sound effects.
+- **Soundtracks** (generated in the browser, no music files): a ragtime piano on the menus, a sneaky minor-key "cartoon chase" during matches, and a dark tango for the story mode final boss. 🎵 toggles music, 🔊 toggles sound effects.
 - Dice and coin animations, card flip reveals, and confetti for the winner.
 
 ## 📁 Files

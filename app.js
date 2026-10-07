@@ -756,6 +756,7 @@ function startGame() {
   Bot.skill = 1;
   Bot.focusPeople = false;        // neutral bots everywhere except story mode
   if (STORY.active) STORY.applyLevel(G);
+  SFX.setTrack(STORY.active && STORY.cfg.boss ? 'boss' : 'match');
   $('story-quit').style.display = STORY.active ? '' : 'none';
   const logReset = G.whoopsiesDeck.onReshuffle;
   G.whoopsiesDeck.onReshuffle = () => { logReset(); toast('🔄 The Whoopsies deck ran out and was reset!'); };

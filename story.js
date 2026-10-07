@@ -227,6 +227,7 @@ const STORY = {
 
   // Back from the table to the setup screen
   leaveGame() {
+    SFX.setTrack('menu');
     G = null;
     busy = false;
     viewerIdx = null;
