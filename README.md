@@ -41,7 +41,7 @@ Good to know:
 
 - Tap **Solo test: you vs 3 bots** to jump straight into a game against the computer.
 - Or pick a player count and switch any seat to **🤖 Bot**. You can mix humans and bots.
-- Bots play cards, use their abilities, react to Whoopsies (Redirect, Slip Away, Not Today!…), Cancel your cards and pick on whoever's winning. They even trash-talk in Table Talk.
+- Bots play to win: they go after whoever is leading (real players first), Cancel the cards that hurt them, pass on Whoopsies with Redirect/Slip Away, use Draw 2 before a shark checks their hand, save Second Chance for the moment a life is about to go, and play Double Trouble on *you* so you flip extra Whoopsies. They even trash-talk in Table Talk.
 - With only one human, there are no pass-the-device screens. You just play.
 
 ## 📖 How to play

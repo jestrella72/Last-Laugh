@@ -57,7 +57,7 @@ const STORY = {
         botLives: i < 4 ? 2 : 3,
         bonusCards: Math.floor(t * 3),          // 0 → 2 extra cards
         bonusUses: i >= 7 ? 1 : 0,
-        skill: +(0.35 + 0.6 * t).toFixed(2),    // how often the bot makes the smart play
+        skill: +(0.6 + 0.4 * t).toFixed(2),     // how often the bot makes the smart play
         boss: false,
       };
     });

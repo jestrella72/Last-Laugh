@@ -1256,6 +1256,13 @@ async function playAction(player, card) {
 
 // Anyone holding Cancel may stop the card. A Cancel can be Cancelled too.
 async function cancelWindow(player, card) {
+  G.cancelStack = G.cancelStack || [];
+  G.cancelStack.push({ player, card });   // bots look at this to protect their own cards
+  try { return await cancelWindowInner(player, card); }
+  finally { G.cancelStack.pop(); }
+}
+
+async function cancelWindowInner(player, card) {
   const holders = G.activePlayers.filter(p => p.id !== player.id && p.hasCard('a_cancel'));
   if (!holders.length) return true;
   let v = holders.find(h => h.isBot && Bot.wantsCancel(h, player, card))?.id ?? -1;
@@ -1356,7 +1363,7 @@ const EFFECTS = {
 
   async a_swap(p) {
     const targets = G.activePlayers.filter(o => o.id !== p.id);
-    const t = await pickPlayer('Swap Hands', 'Swap your whole hand with…', targets, { kicker: p.name, cancel: 'Don\'t swap', who: p, purpose: 'cards' });
+    const t = await pickPlayer('Swap Hands', 'Swap your whole hand with…', targets, { kicker: p.name, cancel: 'Don\'t swap', who: p, purpose: 'swap' });
     if (!t) return;
     if (await luckyLukeBlocks(t, 'Swap Hands')) return;
     SFX.sax();
@@ -1404,7 +1411,7 @@ const EFFECTS = {
   },
 
   async a_double(p) {
-    const t = await pickPlayer('Double Trouble', 'Who takes an extra turn right after this one?', G.activePlayers, { kicker: p.name, who: p, purpose: 'help' });
+    const t = await pickPlayer('Double Trouble', 'Who takes an extra turn right after this one?', G.activePlayers, { kicker: p.name, who: p, purpose: p.isBot ? 'harm' : 'help' });
     G.extraTurns.push(t.id);
     G.addLog(`➕ Double Trouble: ${t.name} gets an extra turn!`);
   },
@@ -1850,7 +1857,7 @@ const RESOLVERS = {
       await hurt(t);
       return;
     }
-    const v = t.isBot ? (Math.random() < .75 ? Bot.pickPlayer(t, others).id : 'keep') : await ask({ who: t,
+    const v = t.isBot ? (Bot.wantsBearPass() ? Bot.pickPlayer(t, others).id : 'keep') : await ask({ who: t,
       kicker: '🐻 Tried to hug a bear', title: `${t.name}, pass the bear?`,
       body: 'Choose another player to take this Whoopsies card, or keep it and lose 1 life.',
       players: others,

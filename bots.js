@@ -26,69 +26,84 @@ class Bot {
   static skill = 1;
   static sharp()        { return Math.random() < Bot.skill; }
 
-  // The player to pick on: most lives, then most cards
+  // Who to pick on: bots gang up on real people. Among those, (or in an
+  // all-bot game) go after whoever is winning: most lives, then most cards.
+  static threat(p) { return p.lives * 10 + p.hand.length; }
   static leader(candidates) {
-    return [...candidates].sort((a, b) =>
-      (b.lives - a.lives) || (b.hand.length - a.hand.length) || (Math.random() - .5))[0];
+    const people = candidates.filter(p => !p.isBot);
+    const pool = people.length ? people : candidates;
+    return [...pool].sort((a, b) => (Bot.threat(b) - Bot.threat(a)) || (Math.random() - .5))[0];
   }
+
+  static handValue(p) { return p.hand.reduce((n, c) => n + Bot.value(c), 0); }
 
   static pickPlayer(bot, candidates, purpose = 'harm') {
     const others = candidates.filter(p => p.id !== bot.id);
+    const pool = others.length ? others : candidates;
     if (purpose === 'help') return candidates.find(p => p.id === bot.id) ?? candidates[0];
-    if (purpose === 'cards') {
-      return [...(others.length ? others : candidates)].sort((a, b) => b.hand.length - a.hand.length)[0];
+    if (purpose === 'cards') {   // most cards, real people first
+      const withCards = pool.filter(p => p.hand.length);
+      const people = withCards.filter(p => !p.isBot);
+      return [...(people.length ? people : withCards.length ? withCards : pool)].sort((a, b) => b.hand.length - a.hand.length)[0];
     }
-    return Bot.leader(others.length ? others : candidates);
+    if (purpose === 'swap') {    // the best hand to trade into
+      return [...pool].sort((a, b) => Bot.handValue(b) - Bot.handValue(a))[0];
+    }
+    return Bot.leader(pool);
   }
 
   static pickCard(bot, cards, purpose = 'discard') {
     return ['trash', 'take', 'recover'].includes(purpose) ? Bot.highest(cards) : Bot.lowest(cards);
   }
 
-  // Rough "how likely is this Whoopsies to cost p a life" (0–1)
+  // Rough "how likely is this Whoopsies to cost p a life" (0-1)
   static harm(w, p) {
     switch (w.id) {
       case 'w_escape':     return 0;
       case 'w_shark':      return p.hand.length < 3 ? 1 : 0;
       case 'w_toaster':
-      case 'w_texting':    return p.hand.length ? .3 : 1;
-      case 'w_bear':       return .2;
+      case 'w_texting':    return p.hand.length ? .35 : 1;
+      case 'w_bear':       return G.currentPassedBear ? 1 : .25;
       case 'w_leftovers':  return .3;
       case 'w_tiles':      return .5;
-      case 'w_outofluck':  return .45;
+      case 'w_outofluck':  return .4;
       case 'w_shoelaces':  return .8;
       case 'w_sunglasses': return 1;
       default:             return .5;
     }
   }
 
+  static has(cards, id) { return cards.find(c => c.id === id); }
+
   // ── On its own turn ───────────────────────────────────────
   static chooseTurnCard(bot) {
-    if (Math.random() > 0.5 + Bot.skill / 2) return null;   // weaker bots sometimes hold back
+    if (Math.random() > 0.6 + Bot.skill * 0.4) return null;   // weaker bots sometimes hold back
     const ok = bot.hand.filter(c => canPlayOnTurn(bot, c).ok);
-    const has = id => ok.find(c => c.id === id);
+    const has = id => Bot.has(ok, id);
     const others = G.activePlayers.filter(o => o.id !== bot.id);
+    const tableHarm = bot.table.reduce((n, e) => n + Bot.harm(e.card, bot), 0);
 
     if (has('a_draw2')) return has('a_draw2');
-    if (has('a_second_chance')) return has('a_second_chance');
-    if (has('a_recover') && G.actionDeck.getAllDiscards().some(c => Bot.value(c) >= 7)) return has('a_recover');
-    if (has('a_take1')) return has('a_take1');
-    if (has('a_safety') && bot.lives === 1 && !G.safetyActive) return has('a_safety');
-    if (has('a_peek') && Bot.coin(.6)) return has('a_peek');
-    if (has('a_swap') && others.some(o => o.hand.length >= bot.hand.length + 3)) return has('a_swap');
-    if (has('a_skip') && Bot.coin(.3)) return has('a_skip');
+    if (has('a_safety') && !G.safetyActive && (bot.lives === 1 || tableHarm >= .8)) return has('a_safety');
+    if (has('a_second_chance') && bot.lives <= bot.maxLives - 2) return has('a_second_chance');
+    if (has('a_recover') && G.actionDeck.getAllDiscards().some(c => Bot.value(c) >= 8)) return has('a_recover');
+    if (has('a_take1') && others.some(o => o.hand.length)) return has('a_take1');
+    if (has('a_swap') && others.some(o => Bot.handValue(o) >= Bot.handValue(bot) + 6)) return has('a_swap');
+    if (has('a_double') && Bot.coin(.7)) return has('a_double');          // makes YOU flip more
+    if (has('a_skip') && Bot.coin(.6)) return has('a_skip');              // skips the leader
+    if (has('a_peek') && !G.flippedThisTurn) return has('a_peek');        // line up an easy flip
     return null;
   }
 
   static wantsAbility(bot) {
     if (!canUseTurnAbility(bot).ok || !Bot.sharp()) return false;
     switch (bot.character.id) {
-      case 'c_fester': return bot.hand.length >= 4 && Bot.coin(.6);
-      case 'c_pete':   return Bot.coin(.5);
-      case 'c_carl':   return Bot.coin(.55);
-      case 'c_bella':  return Bot.coin(.4);
-      case 'c_nina':   return Bot.coin(.5);
-      case 'c_franky': return Bot.coin(.5);
+      case 'c_fester': return bot.hand.length >= 2 && Bot.coin(.85);
+      case 'c_pete':   return Bot.coin(.6);
+      case 'c_carl':   return !G.flippedThisTurn && Bot.coin(.85);
+      case 'c_bella':  return Bot.coin(.5);
+      case 'c_nina':   return Bot.coin(.75);
+      case 'c_franky': return Bot.coin(.85);
       default:         return false;
     }
   }
@@ -97,7 +112,7 @@ class Bot {
   static arrange(bot, cards, kind) {
     const idx = cards.map((_, i) => i);
     if (kind === 'action') return idx.sort((a, b) => Bot.value(cards[b]) - Bot.value(cards[a]));
-    // Whoopsies: about to flip on its own turn → easiest first.
+    // Whoopsies: about to flip on its own turn -> easiest first.
     // Otherwise make life harder for whoever flips next.
     const mine = G.currentPlayerIdx === bot.id && !G.currentWhoopsies;
     const victim = mine ? bot : G.currentPlayer;
@@ -113,49 +128,79 @@ class Bot {
     const w = G.currentWhoopsies;
     const isTarget = bot.id === G.whoopsiesTargetIdx;
     const playable = bot.hand.filter(c => canReact(bot, c).ok);
-    const has = id => playable.find(c => c.id === id);
-    let choice = null;
+    const has = id => Bot.has(playable, id);
+    const harm = Bot.harm(w, bot);
+    const dodges = playable.filter(c => ['a_redirect', 'a_slip', 'a_not_today'].includes(c.id)).length;
 
-    if (isTarget && Bot.harm(w, bot) >= .5) {
-      if (has('a_redirect'))       choice = { type: 'card', card: has('a_redirect') };
-      else if (has('a_slip'))      choice = { type: 'card', card: has('a_slip') };
-      else if (has('a_not_today')) choice = { type: 'card', card: has('a_not_today') };
-      else if (bot.canUseAbility() && bot.character.id === 'c_rosie') choice = { type: 'rosie' };
-      else if (bot.canUseAbility() && bot.character.id === 'c_lou' && bot.id === G.currentPlayerIdx && Bot.coin(.7)) choice = { type: 'lou' };
+    if (isTarget && harm > 0) {
+      // Fix the problem first if a turn card can (Draw 2 before the shark checks)
+      if (w.id === 'w_shark' && bot.hand.length < 3 && has('a_draw2')) return { type: 'card', card: has('a_draw2') };
+      if (['w_toaster', 'w_texting'].includes(w.id) && bot.hand.length === 1 && has('a_draw2')) {
+        return { type: 'card', card: has('a_draw2') };
+      }
+      // Dodge anything that really hurts; with spare dodges, pass on small trouble too
+      if (harm >= .45 || (harm >= .25 && dodges >= 2)) {
+        if (has('a_redirect')) return { type: 'card', card: has('a_redirect') };
+        if (has('a_slip'))     return { type: 'card', card: has('a_slip') };
+        if (harm >= .45 && has('a_not_today')) return { type: 'card', card: has('a_not_today') };
+        if (harm >= .45 && bot.canUseAbility() && bot.character.id === 'c_rosie') return { type: 'rosie' };
+        if (harm >= .45 && bot.canUseAbility() && bot.character.id === 'c_lou' && bot.id === G.currentPlayerIdx) return { type: 'lou' };
+      }
     }
-    if (!choice && has('a_second_chance') && bot.lives < bot.maxLives) {
-      choice = { type: 'card', card: has('a_second_chance') };
-    }
-    return choice;
+    // Second Chance is best saved for the moment a life is about to go
+    if (has('a_second_chance') && bot.lives <= bot.maxLives - 2) return { type: 'card', card: has('a_second_chance') };
+    return null;
   }
 
+  // Should the bot Cancel `card`, just played by `player`?
   static wantsCancel(bot, player, card) {
     if (!Bot.sharp()) return false;
+    const duel = G.activePlayers.length === 2;   // 1-on-1: anything aimed outward hits the bot
+    const w = G.currentWhoopsies;
     switch (card.id) {
       case 'a_slip':
-        return G.currentWhoopsies && G.playerToLeft(G.whoopsiesTargetIdx) === bot.id;
+        return !!w && G.playerToLeft(G.whoopsiesTargetIdx) === bot.id;
       case 'a_redirect':
+        return duel || Bot.coin(.45);
       case 'a_take1':
-      case 'a_swap':        return Bot.coin(.4);
-      case 'a_not_today':   return Bot.coin(.25);
-      case 'a_cancel':      return Bot.coin(.3);
-      default:              return Bot.coin(.12);
+      case 'a_swap':
+        return duel ? (Bot.handValue(bot) >= 10 || Bot.coin(.6)) : Bot.coin(.35);
+      case 'a_not_today':                         // make them eat it
+        return !!w && Bot.harm(w, player) >= .5 && (duel || Bot.coin(.6));
+      case 'a_second_chance':
+        return player.lives <= 1 || Bot.coin(.35);
+      case 'a_double':
+      case 'a_skip':
+        return duel || Bot.coin(.35);
+      case 'a_cancel': {
+        // Cancel a Cancel when it was stopping the bot's own card
+        const stack = G.cancelStack || [];
+        const under = stack[stack.length - 2];
+        return !!under && under.player.id === bot.id;
+      }
+      default:
+        return duel ? Bot.coin(.3) : Bot.coin(.12);
     }
   }
 
   static wantsReroll(mel, roller, value, reason) {
     const outOfLuck = reason.includes('Out of Luck');
     if (roller.id === mel.id) return outOfLuck ? value <= 2 : value < 4;
-    return !outOfLuck && value >= 4 && Bot.coin(.5);
+    return outOfLuck ? (value >= 3 && value <= 4 && Bot.coin(.5)) : value >= 4;   // sabotage the others
   }
 
   static wantsCopy(card) {
-    return ['a_draw2', 'a_take1', 'a_second_chance', 'a_recover'].includes(card.id);
+    return ['a_draw2', 'a_take1', 'a_second_chance', 'a_recover', 'a_peek'].includes(card.id);
   }
 
-  static wantsToSave(bot) { return bot.hand.length >= 4 && Bot.coin(.3); }
+  static wantsToSave(bot) { return bot.hand.length >= 5 && Bot.coin(.2); }
+
+  static wantsBearPass() { return Bot.coin(.95); }
 
   static leftoversChoice(bot) {
+    // Keep valuable abilities; dump two low cards if the hand is big enough
+    const lowTwo = [...bot.hand].sort((a, b) => Bot.value(a) - Bot.value(b)).slice(0, 2);
+    if (bot.hand.length >= 4 && lowTwo.every(c => Bot.value(c) <= 5)) return 'cards';
     if (bot.abilitiesLeft > 0) return 'ability';
     if (bot.hand.length >= 2) return 'cards';
     return 'life';
