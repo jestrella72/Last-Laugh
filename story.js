@@ -171,6 +171,7 @@ const STORY = {
     bot.hand.push(...game.actionDeck.drawMany(lv.bonusCards));
     bot.abilitiesLeft += lv.bonusUses;
     Bot.skill = lv.skill;
+    Bot.focusPeople = true;   // story bots always come after you
     game.addLog(`🏆 Story · ${lv.boss ? 'FINAL BOSS' : `Level ${this.level + 1}`}: ${bot.name} — “${STORY_TAUNTS[bot.character.id]}”`, 'turn');
   },
 
@@ -182,6 +183,7 @@ const STORY = {
   async finish(winner) {
     this.active = false;
     Bot.skill = 1;
+    Bot.focusPeople = false;
     const prog = this.load();
     const levels = this.ladder(prog.heroId);
     const won = winner && !winner.isBot;
@@ -242,6 +244,7 @@ const STORY = {
         if (!ok) return;
         this.active = false;
         Bot.skill = 1;
+        Bot.focusPeople = false;
         this.leaveGame();
         this.renderMap(this.load());
       });

@@ -754,6 +754,7 @@ $('name-input').addEventListener('keydown', e => { if (e.key === 'Enter') confir
 function startGame() {
   G = new Game(setupPlayers);
   Bot.skill = 1;
+  Bot.focusPeople = false;        // neutral bots everywhere except story mode
   if (STORY.active) STORY.applyLevel(G);
   $('story-quit').style.display = STORY.active ? '' : 'none';
   const logReset = G.whoopsiesDeck.onReshuffle;

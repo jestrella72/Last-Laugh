@@ -26,11 +26,12 @@ class Bot {
   static skill = 1;
   static sharp()        { return Math.random() < Bot.skill; }
 
-  // Who to pick on: bots gang up on real people. Among those, (or in an
-  // all-bot game) go after whoever is winning: most lives, then most cards.
+  // Who to pick on: whoever is winning (most lives, then most cards).
+  // In story mode (focusPeople) bots gang up on the real player first.
+  static focusPeople = false;
   static threat(p) { return p.lives * 10 + p.hand.length; }
   static leader(candidates) {
-    const people = candidates.filter(p => !p.isBot);
+    const people = Bot.focusPeople ? candidates.filter(p => !p.isBot) : [];
     const pool = people.length ? people : candidates;
     return [...pool].sort((a, b) => (Bot.threat(b) - Bot.threat(a)) || (Math.random() - .5))[0];
   }
@@ -41,9 +42,9 @@ class Bot {
     const others = candidates.filter(p => p.id !== bot.id);
     const pool = others.length ? others : candidates;
     if (purpose === 'help') return candidates.find(p => p.id === bot.id) ?? candidates[0];
-    if (purpose === 'cards') {   // most cards, real people first
+    if (purpose === 'cards') {   // most cards (real people first in story mode)
       const withCards = pool.filter(p => p.hand.length);
-      const people = withCards.filter(p => !p.isBot);
+      const people = Bot.focusPeople ? withCards.filter(p => !p.isBot) : [];
       return [...(people.length ? people : withCards.length ? withCards : pool)].sort((a, b) => b.hand.length - a.hand.length)[0];
     }
     if (purpose === 'swap') {    // the best hand to trade into
