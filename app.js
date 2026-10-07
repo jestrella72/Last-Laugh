@@ -29,6 +29,71 @@ for (const ev of ['pointerdown', 'touchend', 'click', 'keydown']) {
 
 const botTurn = () => G && G.currentPlayer.isBot;
 
+// ── Reading time ─────────────────────────────────────────────
+// Pop-ups that close by themselves wait this many seconds (with a
+// countdown and a Continue button) so new players can read them.
+// 0 = the old fast mode. Saved on this device.
+const READ = {
+  get seconds() {
+    try { const v = localStorage.getItem('ll-read'); return v === null ? 15 : Math.max(0, Math.min(120, +v)); }
+    catch { return 15; }
+  },
+  set seconds(v) { try { localStorage.setItem('ll-read', String(v)); } catch {} },
+};
+
+// How long an auto-closing pop-up should stay up
+function readMs(fastMs) {
+  const s = READ.seconds;
+  return s > 0 ? s * 1000 : fastMs;
+}
+
+// A shrinking bar + "Continuing in Ns" inside a pop-up
+function readTimer(host, ms) {
+  let el = host.querySelector(':scope > .read-timer');
+  if (!el) {
+    el = document.createElement('div');
+    el.className = 'read-timer';
+    el.innerHTML = '<i></i><span></span>';
+    host.appendChild(el);
+  }
+  el.style.display = ms ? '' : 'none';
+  if (!ms) return;
+  const bar = el.querySelector('i'), label = el.querySelector('span');
+  bar.style.transition = 'none';
+  bar.style.width = '100%';
+  void bar.offsetWidth;
+  bar.style.transition = `width ${ms}ms linear`;
+  bar.style.width = '0%';
+  const end = performance.now() + ms;
+  const token = (el.dataset.token = String(Math.random()));
+  const tick = () => {
+    if (el.dataset.token !== token) return;
+    const left = Math.max(0, Math.ceil((end - performance.now()) / 1000));
+    label.textContent = `Continuing in ${left}s · tap Continue to skip`;
+    if (left > 0) setTimeout(tick, 250);
+  };
+  tick();
+}
+
+function showSettings() {
+  const now = READ.seconds;
+  askLocal({
+    kicker: '⚙️ Settings', title: 'Reading time',
+    html: `<p>How long pop-ups wait before moving on by themselves. You can always tap <b>Continue</b> to skip.</p>
+           <p class="read-value" id="read-value">${now === 0 ? 'Fast (no waiting)' : now + ' seconds'}</p>
+           <input type="range" id="read-range" min="0" max="120" step="5" value="${now}" aria-label="Reading time in seconds"
+                  oninput="document.getElementById('read-value').textContent = this.value == 0 ? 'Fast (no waiting)' : this.value + ' seconds'">
+           <div class="read-scale"><span>0 · fast</span><span>60</span><span>120 s</span></div>`,
+    buttons: [{ label: 'Save', cls: 'btn-yellow', value: 'save' }, { label: 'Cancel', cls: 'btn-plain', value: null }],
+  }).then(v => {
+    if (v !== 'save') return;
+    READ.seconds = +$('read-range').value;
+    toast(`⚙️ Reading time: ${READ.seconds ? READ.seconds + ' seconds' : 'fast'}`);
+  });
+  // the slider lives in the dialog that's open right now
+  setTimeout(() => { const r = $('read-range'); if (r) r.value = now; }, 0);
+}
+
 // How long bots pause before doing things, so people can follow along.
 const BOT_PACE = { step: 1600, think: 1500, popup: 2600, dice: 2600, reveal: 3000 };
 
@@ -157,7 +222,8 @@ function askLocal({ title, kicker = '', body = '', html = '', cards = [], player
 
     // While a bot is playing, plain "OK" pop-ups close by themselves
     const passive = buttons.length <= 1 && !players.length && !cards.some(c => c.value !== undefined);
-    const autoMs  = auto ?? (botTurn() && passive ? BOT_PACE.popup : 0);
+    let autoMs = auto ?? (botTurn() && passive ? BOT_PACE.popup : 0);
+    if (autoMs) autoMs = readMs(autoMs);
     if (autoMs) {
       const started = Date.now();
       const tick = () => {
@@ -217,6 +283,11 @@ function askLocal({ title, kicker = '', body = '', html = '', cards = [], player
       br.appendChild(el);
     }
 
+    readTimer($('modal-box'), autoMs);
+    if (autoMs) {   // the one button becomes "Continue"
+      const only = br.querySelector('button');
+      if (only && buttons.length === 1 && /^(OK|Close)$/.test(only.textContent)) only.textContent = 'Continue ▶';
+    }
     $('modal-overlay').classList.add('open');
     const first = br.querySelector('button:not(:disabled)');
     if (first) first.focus({ preventScroll: true });
@@ -355,8 +426,9 @@ function revealWhoopsies(card, target) {
     let closed = false;
     const close = () => { if (closed) return; closed = true; s.classList.remove('open'); resolve(); };
     $('reveal-btn').onclick = close;
-    if (NET.on) setTimeout(close, 2600);
-    else if (target.isBot) setTimeout(close, BOT_PACE.reveal);
+    const ms = NET.on ? readMs(2600) : target.isBot ? readMs(BOT_PACE.reveal) : 0;
+    readTimer(s, ms);
+    if (ms) setTimeout(close, ms);
   });
 }
 
@@ -394,8 +466,9 @@ function redirectAlert(toPlayer, why, card = G.currentWhoopsies, { sound = true 
     let closed = false;
     const close = () => { if (closed) return; closed = true; s.classList.remove('open'); resolve(); };
     $('redirect-btn').onclick = close;
-    if (NET.on) setTimeout(close, 3000);
-    else if (toPlayer.isBot) setTimeout(close, 2600);
+    const ms = NET.on ? readMs(3000) : toPlayer.isBot ? readMs(2600) : 0;
+    readTimer(s.querySelector('.redirect-inner'), ms);
+    if (ms) setTimeout(close, ms);
   });
 }
 
@@ -460,6 +533,7 @@ async function hurt(player, opts = {}) {
 // Quick full-screen moment: 'nope' (a Cancel) or 'wow' (a life gained).
 // Shows on every screen, with its sound, and closes by itself.
 function popOverlay(kind, title, sub, ms = 1900) {
+  ms = readMs(ms);
   if (NET.isHost) NET.broadcast({ t: 'pop', kind, title, sub });
   if (kind === 'nope') SFX.nope();     // Cancel
   if (kind === 'laugh') SFX.laugh();   // Not Today!
@@ -475,10 +549,12 @@ function popOverlay(kind, title, sub, ms = 1900) {
     const close = () => { s.classList.remove('open'); clearTimeout(timer); resolve(); };
     const timer = setTimeout(close, ms);
     s.onclick = close;
+    readTimer(s.querySelector('.pop-inner'), ms);
   });
 }
 
 function hurtOverlay(title, sub, ms) {
+  ms = readMs(ms);
   return new Promise(resolve => {
     $('hurt-title').textContent = title;
     $('hurt-sub').textContent   = sub;
@@ -488,6 +564,7 @@ function hurtOverlay(title, sub, ms) {
     const close = () => { s.classList.remove('open'); clearTimeout(timer); resolve(); };
     const timer = setTimeout(close, ms);
     $('hurt-btn').onclick = close;
+    readTimer(s, ms);
   });
 }
 
@@ -1246,9 +1323,19 @@ async function playAction(player, card) {
   toast(`${player.name} plays ${card.name}!`, card);
   renderAll();
 
-  if (!(await cancelWindow(player, card))) {
-    G.addLog(`🚫 ${card.name} was cancelled!`);
+  G.cancelCount = 0;
+  const goesThrough = await cancelWindow(player, card);
+  // Say clearly how a Cancel fight ended
+  const KEEP = { a_swap: ': everyone keeps their hand', a_take1: ': nobody loses a card', a_redirect: ': the Whoopsies stays put',
+                 a_slip: ': the Whoopsies stays put', a_not_today: ': the Whoopsies still hits', a_second_chance: ': no life gained' };
+  if (!goesThrough) {
+    G.addLog(`🚫 ${card.name} was cancelled${KEEP[card.id] || ''}!`);
+    toast(`🚫 ${player.name}'s ${card.name} was cancelled${KEEP[card.id] || ': nothing happens'}`, card);
     return 'cancelled';
+  }
+  if (G.cancelCount) {
+    G.addLog(`✋✋ The Cancel was cancelled: ${player.name}'s ${card.name} goes through!`);
+    toast(`✋✋ The Cancel was cancelled: ${card.name} goes through!`, card);
   }
   const result = await EFFECTS[card.id](player, { copy: false });
   renderAll();
@@ -1296,6 +1383,7 @@ async function cancelWindowInner(player, card) {
   G.addLog(`✋ ${canceller.name} plays Cancel on ${player.name}'s ${card.name}!`);
   renderAll();
   await popOverlay('nope', 'NOPE!', `${canceller.name} cancels ${player.name}'s ${card.name}!`);
+  G.cancelCount = (G.cancelCount || 0) + 1;
   // If the Cancel itself gets cancelled, the original card goes through
   return !(await cancelWindow(canceller, cancelCard));
 }
@@ -1997,6 +2085,7 @@ function showRules() {
         <li><b>Cancel</b> can stop any Action card, and Cancels stack: Cancel the Cancel, and so on. The game asks automatically.</li>
         <li><b>Redirects stack:</b> whoever a Whoopsies gets redirected to can Redirect it again.</li>
         <li><b>Only the player whose turn it is flips a Whoopsies.</b> Everyone else waits for their turn.</li>
+        <li><b>⚙️ Reading time:</b> pop-ups wait (15 seconds by default) so you can read them. Tap <b>Continue</b> to skip, or change the time in ⚙️ Settings.</li>
         <li><b>🏆 Story mode:</b> beat every character one by one in 1-on-1 duels. Each level is harder, and the final boss waits at the end.</li>
         <li><b>Decks:</b> when the Action deck runs out, nobody draws Action cards any more. When the Whoopsies deck runs out, it's reset (shuffled back in).</li>
         <li><b>About to lose a life?</b> You'll be offered Not Today! (if a Whoopsies is hitting you) and Second Chance to keep it.</li>

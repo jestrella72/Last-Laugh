@@ -824,3 +824,17 @@ input, select { font-size: 16px !important; }   /* stops iPhone zooming into inp
 #pop-screen.pop-laugh { background: radial-gradient(circle, rgba(255, 216, 77, .92), rgba(34, 179, 94, .88)); }
 
 .story-warning { font-weight: 800; color: var(--red); }
+
+/* ── Reading time countdown ──────────────────────────────── */
+.read-timer { width: min(320px, 80vw); margin: 12px auto 0; text-align: center; }
+.read-timer i {
+  display: block; height: 8px; width: 100%;
+  background: var(--yellow); border: 2px solid var(--ink); border-radius: 999px;
+}
+.read-timer span { display: block; font-size: .78rem; font-weight: 800; margin-top: 4px; color: inherit; opacity: .85; }
+#reveal-screen .read-timer span, #redirect-screen .read-timer span,
+#hurt-screen .read-timer span, #pop-screen .read-timer span { color: #fff; text-shadow: 1px 1px 0 rgba(0,0,0,.5); }
+#pop-btn { margin-top: 10px; }
+.read-value { font-family: var(--display); font-size: 1.6rem; margin: 6px 0; }
+#read-range { width: 100%; accent-color: var(--purple); height: 28px; }
+.read-scale { display: flex; justify-content: space-between; font-weight: 800; font-size: .8rem; color: var(--ink-soft); }

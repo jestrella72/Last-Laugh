@@ -46,6 +46,8 @@ Good to know:
 
 ## 📖 How to play
 
+> **New to the game?** Pop-ups wait so you can read them (15 seconds by default) with a countdown and a **Continue ▶** button to skip. Change the time (0 = fast, up to 120 seconds) in **⚙️ Settings**.
+
 **Goal:** be the last player with lives left. You get the Last Laugh!
 
 **Setup**
