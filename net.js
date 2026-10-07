@@ -665,7 +665,7 @@ function showOnlineMenu() {
 }
 
 function hideSetupPanels() {
-  for (const id of ['setup-count', 'setup-char', 'online-panel', 'join-panel', 'lobby']) $(id).style.display = 'none';
+  for (const id of ['setup-count', 'setup-char', 'online-panel', 'join-panel', 'lobby', 'story-panel']) $(id).style.display = 'none';
 }
 
 function backToMenu() {

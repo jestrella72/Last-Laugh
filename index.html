@@ -19,7 +19,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Luckiest+Guy&family=Nunito:wght@600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=17">
+  <link rel="stylesheet" href="styles.css?v=18">
 </head>
 <body>
 
@@ -45,6 +45,7 @@
     <p class="sub">Pass-and-play on one device. Everyone gets a character and 5 Action cards.</p>
     <div class="count-row" id="count-row"></div>
     <div class="solo-row">
+      <button class="btn btn-red btn-big" onclick="STORY.open()">🏆 Story mode</button>
       <button class="btn btn-purple btn-big" onclick="startSolo(4)">🤖 Solo test: you vs 3 bots</button>
       <span class="sub">Or pick a number above and turn any seat into a bot.</span>
     </div>
@@ -59,6 +60,13 @@
   </div>
 
   <div class="panel" id="online-panel" style="display:none"></div>
+
+  <div class="panel" id="story-panel" style="display:none">
+    <h2>🏆 The Last Laugh Tour</h2>
+    <p class="sub" id="story-sub"></p>
+    <div id="story-ladder" class="story-ladder"></div>
+    <div class="setup-actions" id="story-actions"></div>
+  </div>
 
   <div class="panel" id="join-panel" style="display:none">
     <h2>🔗 Join a room</h2>
@@ -111,6 +119,7 @@
     <div class="mini-logo">Last Laugh!</div>
     <div id="turn-label"></div>
     <div class="topbar-buttons">
+      <button class="btn btn-icon" id="story-quit" onclick="STORY.quit()" title="Leave this duel" aria-label="Leave this duel" style="display:none">🏳️</button>
       <button class="btn btn-icon" id="music-btn" onclick="toggleMusic()" title="Music on/off" aria-label="Music on/off">🎵</button>
       <button class="btn btn-icon" id="sfx-btn"   onclick="toggleSfx()"   title="Sound effects on/off" aria-label="Sound effects on/off">🔊</button>
       <button class="btn btn-icon" onclick="showRules()" title="How to play" aria-label="How to play">📖</button>
@@ -242,16 +251,17 @@
     <div id="winner-title"></div>
     <div class="card" id="winner-card"><img id="winner-img" src="" alt=""></div>
     <p id="winner-msg"></p>
-    <button class="btn btn-big btn-plain" onclick="location.reload()">Play again</button>
+    <button class="btn btn-big btn-plain" id="winner-again" onclick="location.href = location.pathname">Play again</button>
   </div>
 </div>
 
 <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
-<script src="cards.js?v=17"></script>
-<script src="game.js?v=17"></script>
-<script src="sound.js?v=17"></script>
-<script src="bots.js?v=17"></script>
-<script src="net.js?v=17"></script>
-<script src="app.js?v=17"></script>
+<script src="cards.js?v=18"></script>
+<script src="game.js?v=18"></script>
+<script src="sound.js?v=18"></script>
+<script src="bots.js?v=18"></script>
+<script src="net.js?v=18"></script>
+<script src="story.js?v=18"></script>
+<script src="app.js?v=18"></script>
 </body>
 </html>

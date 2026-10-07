@@ -629,6 +629,7 @@ function startSetup(n, solo = false) {
 function startSolo(n) { startSetup(n, true); }
 
 function setupBack() {
+  if (setupMode === 'story') { backToMenu(); return; }
   if (setupMode !== 'local') { location.href = location.pathname; return; }
   if (setupPlayers.length) {
     setupPlayers.pop();
@@ -650,7 +651,8 @@ function renderCharSelect() {
   const lives = setupCount <= 3 ? 3 : setupCount <= 5 ? 2 : 1;
   const online = setupMode !== 'local';
   document.querySelector('#setup-char .name-row').style.display = setupMode === 'join' ? 'none' : '';
-  $('setup-title').textContent = setupMode === 'host' ? 'Create a room · pick your character'
+  $('setup-title').textContent = setupMode === 'story' ? '🏆 Story mode · pick your hero'
+    : setupMode === 'host' ? 'Create a room · pick your character'
     : setupMode === 'join' ? `Room ${NET.code} · pick your character`
     : setupSolo
     ? `Solo test · you vs ${setupCount - 1} bots · ${lives} ${lives === 1 ? 'life' : 'lives'} each`
@@ -708,6 +710,10 @@ function addBotSeat(character) {
 async function confirmCharacter() {
   if (setupSeatBot && !setupChoice) setupChoice = randomFreeCharacter();
   if (!setupChoice) { await info('Pick a character!', 'Tap one of the character cards first.', { local: true }); return; }
+  if (setupMode === 'story') {
+    STORY.begin($('name-input').value.trim() || 'Hero', setupChoice);
+    return;
+  }
   if (setupMode === 'host') {
     const name = $('name-input').value.trim() || 'Host';
     try { localStorage.setItem('ll-name', name); } catch {}
@@ -746,6 +752,9 @@ $('name-input').addEventListener('keydown', e => { if (e.key === 'Enter') confir
 
 function startGame() {
   G = new Game(setupPlayers);
+  Bot.skill = 1;
+  if (STORY.active) STORY.applyLevel(G);
+  $('story-quit').style.display = STORY.active ? '' : 'none';
   const logReset = G.whoopsiesDeck.onReshuffle;
   G.whoopsiesDeck.onReshuffle = () => { logReset(); toast('🔄 The Whoopsies deck ran out and was reset!'); };
   G.addLog(`Welcome to Last Laugh! ${G.players.length} players, ${G.players[0].maxLives} ${G.players[0].maxLives === 1 ? 'life' : 'lives'} each.`, 'turn');
@@ -783,7 +792,7 @@ function renderPlayers() {
     bar.appendChild(chip);
   }
   const p = G.currentPlayer;
-  $('turn-label').textContent = `Turn ${G.turn} · ${p.name}'s turn`;
+  $('turn-label').textContent = `${STORY.label()}Turn ${G.turn} · ${p.name}'s turn`;
 }
 
 function renderTable() {
@@ -1925,7 +1934,8 @@ const RESOLVERS = {
 //  WINNER, RULES, SOUND TOGGLES
 // =============================================================
 
-function showWinner() {
+function showWinner(force = false) {
+  if (STORY.active && !force) { STORY.finish(G.winner); return; }
   const w = G.winner;
   SFX.fanfare();
   $('winner-title').textContent = `${w.name} gets the Last Laugh!`;
@@ -1971,6 +1981,7 @@ function showRules() {
         <li><b>Cancel</b> can stop any Action card, and Cancels stack: Cancel the Cancel, and so on. The game asks automatically.</li>
         <li><b>Redirects stack:</b> whoever a Whoopsies gets redirected to can Redirect it again.</li>
         <li><b>Only the player whose turn it is flips a Whoopsies.</b> Everyone else waits for their turn.</li>
+        <li><b>🏆 Story mode:</b> beat every character one by one in 1-on-1 duels. Each level is harder, and the final boss waits at the end.</li>
         <li><b>Decks:</b> when the Action deck runs out, nobody draws Action cards any more. When the Whoopsies deck runs out, it's reset (shuffled back in).</li>
         <li><b>About to lose a life?</b> You'll be offered Not Today! (if a Whoopsies is hitting you) and Second Chance to keep it.</li>
         <li><b>Everyone has a table.</b> A Whoopsies sent to you (Redirect, Slip Away, the bear, Out of Luck!!, Fester) lands face-up on your table and waits for <b>your turn</b>. On your turn you face those first, then flip your own. A table holds at most 2.</li>

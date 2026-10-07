@@ -16,6 +16,13 @@ python -m http.server 8090
 
 Then open http://localhost:8090.
 
+### 🏆 Story mode
+
+Tap **🏆 Story mode**, pick your hero, and beat every other character in **1-on-1 duels**, easiest first:
+Naive Nina → Cautious Casey → Bold Bella → Curious Carl → Melo Mel → Prankster Pete → Lucky Luke → Reckless Rosie → Franky Ice → Grumpy Lou → Slick Rick → **👑 final boss: Fester the Cat** (if you play as Fester, Slick Rick is the boss).
+
+Each level gets harder: the bot plays smarter, has more lives (2 → 3), and later starts with bonus cards and extra ability uses. The final boss has 4 lives, 4 bonus cards, 2 extra ability uses and plays perfectly. Your progress is saved on your device, and you can retry any level as often as you like (🏳️ leaves a duel).
+
 ### 🌐 Playing online (everyone on their own phone)
 
 1. One person taps **🏠 Create a room**, types their name and picks a character.

@@ -799,3 +799,23 @@ input, select { font-size: 16px !important; }   /* stops iPhone zooming into inp
 .pop-nope #pop-emoji { animation: popIn .5s cubic-bezier(.2,1.7,.4,1) both, nopeShake .45s .5s ease-in-out 2; }
 @keyframes popIn { from { transform: scale(0) rotate(-30deg); } }
 @keyframes nopeShake { 25% { transform: rotate(-12deg); } 75% { transform: rotate(12deg); } }
+
+/* ── Story mode ──────────────────────────────────────────── */
+.story-ladder { display: flex; flex-direction: column; gap: 8px; margin-bottom: 6px; }
+.story-level {
+  display: flex; align-items: center; gap: 12px;
+  background: #fff; border: 3px solid var(--ink); border-radius: 14px;
+  box-shadow: 3px 3px 0 var(--ink); padding: 6px 12px;
+}
+.story-level .portrait { margin: 0; width: 48px; height: 48px; flex: none; display: grid; place-items: center; font-size: 1.4rem; }
+.story-num { font-family: var(--display); font-size: 1.4rem; width: 30px; text-align: center; }
+.story-who { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.story-who b { font-family: var(--display); font-weight: 400; font-size: 1.1rem; }
+.story-who span { font-size: .8rem; font-weight: 700; color: var(--ink-soft); }
+.story-state { font-size: 1.4rem; }
+.story-level.beaten { opacity: .6; }
+.story-level.next { background: var(--yellow); transform: translateX(6px); }
+.story-level.locked { filter: grayscale(.8); opacity: .75; }
+.story-level.boss { border-color: var(--red); box-shadow: 3px 3px 0 var(--red); }
+.story-level.boss.next { background: #ffd9dc; }
+.story-taunt { font-family: var(--display); font-size: 1.25rem; color: var(--red); }

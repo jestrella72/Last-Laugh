@@ -21,6 +21,11 @@ class Bot {
   static highest(cards) { return [...cards].sort((a, b) => Bot.value(b) - Bot.value(a))[0] ?? null; }
   static coin(p)        { return Math.random() < p; }
 
+  // How sharp the bot plays: 1 = full strength (normal games). Story mode
+  // starts low, so early bots sometimes miss a play or forget to react.
+  static skill = 1;
+  static sharp()        { return Math.random() < Bot.skill; }
+
   // The player to pick on: most lives, then most cards
   static leader(candidates) {
     return [...candidates].sort((a, b) =>
@@ -59,6 +64,7 @@ class Bot {
 
   // ── On its own turn ───────────────────────────────────────
   static chooseTurnCard(bot) {
+    if (Math.random() > 0.5 + Bot.skill / 2) return null;   // weaker bots sometimes hold back
     const ok = bot.hand.filter(c => canPlayOnTurn(bot, c).ok);
     const has = id => ok.find(c => c.id === id);
     const others = G.activePlayers.filter(o => o.id !== bot.id);
@@ -75,7 +81,7 @@ class Bot {
   }
 
   static wantsAbility(bot) {
-    if (!canUseTurnAbility(bot).ok) return false;
+    if (!canUseTurnAbility(bot).ok || !Bot.sharp()) return false;
     switch (bot.character.id) {
       case 'c_fester': return bot.hand.length >= 4 && Bot.coin(.6);
       case 'c_pete':   return Bot.coin(.5);
@@ -103,6 +109,7 @@ class Bot {
   // ── Reacting to a Whoopsies ───────────────────────────────
   // Returns { type: 'card', card } | { type: 'rosie' } | { type: 'lou' } | null
   static reaction(bot) {
+    if (!Bot.sharp()) return null;   // weaker bots sometimes forget to react
     const w = G.currentWhoopsies;
     const isTarget = bot.id === G.whoopsiesTargetIdx;
     const playable = bot.hand.filter(c => canReact(bot, c).ok);
@@ -123,6 +130,7 @@ class Bot {
   }
 
   static wantsCancel(bot, player, card) {
+    if (!Bot.sharp()) return false;
     switch (card.id) {
       case 'a_slip':
         return G.currentWhoopsies && G.playerToLeft(G.whoopsiesTargetIdx) === bot.id;
