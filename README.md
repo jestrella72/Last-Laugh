@@ -91,7 +91,7 @@ Good to know:
 
 **Characters (13 + 1 boss):** Curious Carl, Cautious Casey, Prankster Pete, Bold Bella, Lucky Luke, Naive Nina, Reckless Rosie, Melo Mel, Franky Ice, Grumpy Lou, Slick Rick, Fester the Cat, Lenny the Shark, and the locked 👑 boss card **Leo the Lion**
 
-- **Naive Nina** now has **4 ability uses**. When she calls the coin right, everyone sees which card she trashed.
+- **Naive Nina:** when she calls the coin right, everyone sees which card she trashed.
 - **Take 1:** the player who takes the card sees what they got, and the player who lost it sees what was taken.
 - **Lenny the Shark 🦈** (Reaction, 3 uses): whenever your hand drops below 3 cards, the game offers you 1 free Action card draw. Say no and it only asks again once your hand gets even smaller. You can also use it from the React menu (handy before "Tried to pet a shark" resolves).
 - **Leo the Lion 🦁** (Boss card, Play At Any Time, 3 uses): discard a card, pick a player, then pick ANY Whoopsies from the discard pile to put on their table. Use it on your turn or while someone is facing a Whoopsies (once per Whoopsies). Locked until you beat Story mode on that device.
