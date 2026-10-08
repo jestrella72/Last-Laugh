@@ -64,7 +64,7 @@ const TUTORIAL = {
          <tr><td>${tTag(TIMING.ANY_TIME)}</td><td>Even on someone else's turn, whenever it makes sense.</td></tr>
          <tr><td>${tTag(TIMING.REACTION)}</td><td>In response to something: a Whoopsies, a card, a Take 1…</td></tr>
        </table>
-       <p>You don't have to watch for your chance: <b>the game pops up and asks you</b> whenever you can react. Dodge a Whoopsies with <b>Not Today!</b>, <b>Redirect</b> or <b>Slip Away</b>, or stop any card with <b>Cancel</b> (and yes, you can Cancel a Cancel).</p>`,
+       <p>You don't have to watch for your chance: <b>the game pops up and asks you</b> whenever you can react. Dodge a Whoopsies with <b>Not Today!</b> or <b>Slip Away</b>, use <b>Redirect</b> on <b>anyone's</b> Whoopsies (even on their turn), or stop any card with <b>Cancel</b> (and yes, you can Cancel a Cancel).</p>`,
       () => tRow(tCardHTML('a_draw2', { cls: 't-pop', w: 105 }) + tCardHTML('a_not_today', { cls: 't-pop', delay: .2, w: 105 }) + tCardHTML('a_cancel', { cls: 't-pop', delay: .4, w: 105 })));
 
     // ── Page 4 · Characters ────────────────────────────────

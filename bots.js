@@ -149,6 +149,14 @@ class Bot {
         if (harm >= .45 && bot.canUseAbility() && bot.character.id === 'c_lou' && bot.id === G.currentPlayerIdx) return { type: 'lou' };
       }
     }
+    // Redirect works on anyone's Whoopsies: with a spare one, send a nasty card
+    // aimed at someone else on to the leader instead (never back to itself)
+    const spare = bot.hand.filter(c => ['a_redirect', 'a_slip', 'a_not_today'].includes(c.id)).length >= 2;
+    if (!isTarget && has('a_redirect') && spare && Bot.harm(w, G.whoopsiesTarget) >= .45 && Bot.coin(.35)) {
+      const pool = G.activePlayers.filter(o => o.id !== bot.id && o.id !== G.whoopsiesTargetIdx && G.canReceive(o));
+      const lead = pool.length ? Bot.leader(pool) : null;
+      if (lead && Bot.leader([lead, G.whoopsiesTarget]) === lead) return { type: 'card', card: has('a_redirect') };
+    }
     // Leo the Lion piles on: while someone else faces a Whoopsies, deal them another one
     if (bot.character.id === 'c_leo' && !isTarget && bot.hand.length >= 2 && canUseTurnAbility(bot).ok && Bot.coin(.45)) {
       return { type: 'leo' };

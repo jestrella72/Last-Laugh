@@ -1570,8 +1570,9 @@ const EFFECTS = {
   },
 
   async a_redirect(p) {
-    const others = G.activePlayers.filter(o => o.id !== G.whoopsiesTargetIdx && G.canReceive(o));
-    const t = await pickPlayer('Redirect', 'Who faces this Whoopsies instead?', others, { kicker: p.name, who: p });
+    // Anyone can Redirect, on any turn: it goes to someone other than its target (and not to yourself)
+    const others = G.activePlayers.filter(o => o.id !== G.whoopsiesTargetIdx && o.id !== p.id && G.canReceive(o));
+    const t = await pickPlayer('Redirect', `Who faces this Whoopsies instead of ${G.whoopsiesTarget.name}?`, others, { kicker: p.name, who: p });
     botSay(p, 'redirect');
     SFX.fahhh();   // everyone hears it (online it's echoed to every phone)
     await redirectTo(t.id, `${p.name} played Redirect`, { sound: false });
@@ -1865,10 +1866,9 @@ function canReact(reactor, c) {
     case 'a_not_today':
       if (!isTarget) return { ok: false, reason: 'Only the target' };
       return w.unstoppable ? { ok: false, reason: 'Can\'t stop this one' } : { ok: true };
-    case 'a_redirect':
-      if (!isTarget) return { ok: false, reason: 'Only the target' };
-      return G.activePlayers.some(o => o.id !== reactor.id && G.canReceive(o))
-        ? { ok: true } : { ok: false, reason: 'Everyone has 2 already' };
+    case 'a_redirect':   // Play At Any Time: anyone can send ANY Whoopsies to someone else
+      return G.activePlayers.some(o => o.id !== reactor.id && o.id !== G.whoopsiesTargetIdx && G.canReceive(o))
+        ? { ok: true } : { ok: false, reason: 'Nobody else can take it' };
     case 'a_slip':
       if (!isTarget) return { ok: false, reason: 'Only the target' };
       return G.canReceive(G.players[G.playerToLeft(reactor.id)])
@@ -2225,7 +2225,7 @@ function showRules() {
       <h4>Good to know</h4>
       <ul>
         <li><b>Cancel</b> can stop any Action card, and Cancels stack: Cancel the Cancel, and so on. The game asks automatically.</li>
-        <li><b>Redirects stack:</b> whoever a Whoopsies gets redirected to can Redirect it again.</li>
+        <li><b>Redirect works on any turn:</b> anyone can play it while someone faces a Whoopsies and send it to another player (not back to its target, not to yourself). Redirects stack: whoever gets it can Redirect it again.</li>
         <li><b>Only the player whose turn it is flips a Whoopsies.</b> Everyone else waits for their turn.</li>
         <li><b>⚙️ Reading time:</b> pop-ups wait (15 seconds by default) so you can read them. Tap <b>Continue</b> to skip, or change the time in ⚙️ Settings.</li>
         <li><b>🏆 Story mode:</b> beat every character one by one in 1-on-1 duels. Each level is harder, and the final boss waits at the end.</li>

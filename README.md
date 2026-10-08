@@ -85,7 +85,7 @@ Good to know:
 
 **Out of Luck!!** on a 5–6 goes to the table of the player on your left or right, and they roll for it on their turn.
 
-**Cancel** can stop any Action card, and Cancels stack (Cancel the Cancel, and so on). **Redirects stack** too: whoever a Whoopsies is redirected to can Redirect it again. **Not Today!** can be played at any time, even right before a Whoopsies takes your life. The game asks automatically whenever someone plays a card. **Drove wearing sunglasses at night** can only be stopped by Slip Away or Redirect.
+**Cancel** can stop any Action card, and Cancels stack (Cancel the Cancel, and so on). **Redirect is Play At Any Time:** any player can play it on **any** turn, whenever someone is facing a Whoopsies, and send it to another player's table (not back to the person it was aimed at, and not to yourself). **Redirects stack** too: whoever a Whoopsies is redirected to can Redirect it again. **Not Today!** can be played at any time, even right before a Whoopsies takes your life. The game asks automatically whenever someone plays a card. **Drove wearing sunglasses at night** can only be stopped by Slip Away or Redirect.
 
 ## 🃏 The cards
 
