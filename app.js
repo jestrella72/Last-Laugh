@@ -1330,6 +1330,26 @@ async function onHandCardClick(card) {
  * discard → anyone may Cancel it → effect → Slick Rick may copy it.
  * Returns the effect's result ('negated', 'end_turn', …) or 'cancelled'.
  */
+// Take 1: the taker sees what they took and the victim sees what they lost.
+// Online each one gets it on their own phone. On a shared screen it's shown
+// once, to whoever is human (the taker first).
+async function showTakenCard(taker, victim, card) {
+  if (!card) return;
+  const tookIt = () => info('Take 1 🫳', `You took ${card.name} from ${victim.name}.`,
+    { kicker: 'You got…', cards: [{ card }], single: true, who: taker });
+  const lostIt = () => info('Take 1 🫳', `${taker.name} took your ${card.name}.`,
+    { kicker: 'You lost…', cards: [{ card }], single: true, who: victim });
+  if (NET.on) {
+    const shows = [];
+    if (!taker.isBot) shows.push(tookIt());
+    if (!victim.isBot) shows.push(lostIt());
+    await Promise.all(shows);
+    return;
+  }
+  if (!taker.isBot) await tookIt();
+  else if (!victim.isBot) await lostIt();
+}
+
 async function playAction(player, card) {
   const result = await playActionInner(player, card);
   await lennyCheck();   // hands can shrink (Take 1, Swap, Cancel…): Lenny may top up
@@ -1471,6 +1491,8 @@ const EFFECTS = {
     p.hand.push(stolen);
     G.addLog(`🫳 ${p.name} takes a card from ${t.name}!`);
     toast(`${p.name} snatches a card from ${t.name}!`);
+    renderAll();
+    await showTakenCard(p, t, stolen);
   },
 
   async a_swap(p) {
@@ -1648,6 +1670,10 @@ const ABILITIES = {
     t.removeFromHand(card.instanceId);
     G.actionDeck.discard(card);
     G.addLog(`🗑️ ${p.name} trashes ${t.name}'s ${card.name}!`);
+    renderAll();
+    // Everyone gets to see which card Nina threw away
+    await info('Naive Nina 🪙', `${p.name} called it right and trashed ${t.name}'s ${card.name}!`,
+               { kicker: 'Called it!', cards: [{ card }], single: true });
   },
 
   async c_franky(p) {

@@ -224,7 +224,7 @@ const CHARACTER_CARDS = [
   new CharacterCard('c_luke', 'Lucky Luke', IMG + 'c-luke.webp', 3, TIMING.REACTION,
     'Roll a die. On a 4 or higher, cancel a Take 1 or Swap Hands card\'s effect.'),
 
-  new CharacterCard('c_nina', 'Naive Nina', IMG + 'c-nina.webp', 3, TIMING.YOUR_TURN,
+  new CharacterCard('c_nina', 'Naive Nina', IMG + 'c-nina.webp', 4, TIMING.YOUR_TURN,
     'Choose a player to reveal their entire hand. Flip a coin, heads or tails. If you called it right, trash 1 card from their hand.'),
 
   new CharacterCard('c_rosie', 'Reckless Rosie', IMG + 'c-rosie.webp', 3, TIMING.ANY_TIME,
