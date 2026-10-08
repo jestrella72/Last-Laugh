@@ -18,7 +18,7 @@ Then open http://localhost:8090.
 
 ### 📖 Tutorial
 
-New players: tap **📖 Tutorial** (next to Story mode) for an animated walkthrough of the whole game: your turn step by step, timing tags (During Your Turn / Play At Any Time / Reaction), how reactions and Cancel work, your Whoopsies table, ability uses, and every character's ability. Jump between chapters at the top, use ◀ ▶ (or the arrow keys), and finish with a practice game.
+New players: tap **📖 Tutorial** (next to Story mode) for a quick 5-page walkthrough: the goal, your turn, when you can play a card (timing tags and reactions), your character's ability uses, and the Whoopsies table. It ends with buttons to start a practice game or Story mode.
 
 ### 🏆 Story mode
 
