@@ -19,7 +19,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Luckiest+Guy&family=Nunito:wght@600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=30">
+  <link rel="stylesheet" href="styles.css?v=31">
 </head>
 <body>
 
@@ -47,6 +47,7 @@
     <div class="count-row" id="count-row"></div>
     <div class="solo-row">
       <button class="btn btn-red btn-big" onclick="STORY.open()">🏆 Story mode</button>
+      <button class="btn btn-yellow btn-big" onclick="TUTORIAL.open()">📖 Tutorial</button>
       <button class="btn btn-purple btn-big" onclick="startSolo(4)">🤖 Solo test: you vs 3 bots</button>
       <span class="sub">Or pick a number above and turn any seat into a bot.</span>
     </div>
@@ -189,6 +190,25 @@
 <div id="toasts"></div>
 <div id="net-banner" role="status"></div>
 
+<div id="tutorial-screen" class="overlay" role="dialog" aria-modal="true" aria-labelledby="t-title">
+  <div id="t-panel">
+    <div class="t-top">
+      <div id="t-chapters" class="t-chapters"></div>
+      <button class="btn btn-icon t-close" onclick="TUTORIAL.close()" aria-label="Close tutorial">✕</button>
+    </div>
+    <div class="t-bar"><div id="t-progress"></div></div>
+    <div id="t-kicker" class="t-kicker"></div>
+    <h2 id="t-title" class="t-title"></h2>
+    <div id="t-stage" class="t-stage"></div>
+    <div id="t-body" class="t-body"></div>
+    <div class="t-nav">
+      <button id="t-back" class="btn btn-plain" onclick="TUTORIAL.go(TUTORIAL.i - 1)">◀ Back</button>
+      <span id="t-count" class="t-count"></span>
+      <button id="t-next" class="btn btn-yellow">Next ▶</button>
+    </div>
+  </div>
+</div>
+
 <div id="modal-overlay" class="overlay">
   <div id="modal-box" role="dialog" aria-modal="true" aria-labelledby="modal-title">
     <div id="modal-kicker"></div>
@@ -259,12 +279,13 @@
 </div>
 
 <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
-<script src="cards.js?v=30"></script>
-<script src="game.js?v=30"></script>
-<script src="sound.js?v=30"></script>
-<script src="bots.js?v=30"></script>
-<script src="net.js?v=30"></script>
-<script src="story.js?v=30"></script>
-<script src="app.js?v=30"></script>
+<script src="cards.js?v=31"></script>
+<script src="game.js?v=31"></script>
+<script src="sound.js?v=31"></script>
+<script src="bots.js?v=31"></script>
+<script src="net.js?v=31"></script>
+<script src="story.js?v=31"></script>
+<script src="app.js?v=31"></script>
+<script src="tutorial.js?v=31"></script>
 </body>
 </html>

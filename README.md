@@ -16,6 +16,10 @@ python -m http.server 8090
 
 Then open http://localhost:8090.
 
+### 📖 Tutorial
+
+New players: tap **📖 Tutorial** (next to Story mode) for an animated walkthrough of the whole game: your turn step by step, timing tags (During Your Turn / Play At Any Time / Reaction), how reactions and Cancel work, your Whoopsies table, ability uses, and every character's ability. Jump between chapters at the top, use ◀ ▶ (or the arrow keys), and finish with a practice game.
+
 ### 🏆 Story mode
 
 Tap **🏆 Story mode**, pick your hero, and beat every other character in **1-on-1 duels**, easiest first:
