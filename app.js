@@ -134,7 +134,8 @@ function acesHTML(p) {
 }
 
 function portraitStyle(character) {
-  return `background-image:url('${character.image}')`;
+  return `background-image:url('${character.image}')` +
+         (character.portrait ? `;background-position:${character.portrait}` : '');
 }
 
 function chipEl(p, { flags = true } = {}) {
@@ -687,6 +688,7 @@ let setupMode    = 'local'; // 'local' | 'host' (create room) | 'join' (joined a
 const BOT_NAMES = {
   c_carl: 'Carl', c_casey: 'Casey', c_pete: 'Pete', c_bella: 'Bella', c_luke: 'Luke', c_nina: 'Nina',
   c_rosie: 'Rosie', c_mel: 'Mel', c_franky: 'Franky', c_lou: 'Lou', c_rick: 'Rick', c_fester: 'Fester',
+  c_lenny: 'Lenny', c_leo: 'Leo',
 };
 
 function renderCountButtons() {
@@ -746,16 +748,26 @@ function renderCharSelect() {
   const grid  = $('char-grid');
   grid.innerHTML = '';
   for (const c of CHARACTER_CARDS) {
+    const locked = !c.isUnlocked;
     const b = document.createElement('button');
     b.type = 'button';
-    b.className = 'char-option' + (taken.includes(c.id) ? ' taken' : '');
+    b.className = 'char-option' + (taken.includes(c.id) ? ' taken' : '') + (locked ? ' locked' : '') + (c.boss ? ' boss' : '');
     b.dataset.id = c.id;
     b.appendChild(cardEl(c));
+    if (locked) {
+      const l = document.createElement('div');
+      l.className = 'lock-badge';
+      l.innerHTML = '🔒<span>Beat Story mode to unlock</span>';
+      b.appendChild(l);
+    }
     const u = document.createElement('div');
     u.className = 'uses';
-    u.textContent = `${c.uses} uses`;
+    u.textContent = locked ? '🔒 Locked boss' : `${c.boss ? '👑 Boss · ' : ''}${c.uses} uses`;
     b.appendChild(u);
-    b.onclick = () => selectCharacter(c.id);
+    b.onclick = () => locked
+      ? info('🔒 Locked boss card', `${c.name} is the final boss of Story mode. Beat him in the Last Laugh Tour to unlock him on this device.`,
+             { local: true, cards: [{ card: c }], single: true })
+      : selectCharacter(c.id);
     grid.appendChild(b);
   }
   if (keep && !taken.includes(keep.id)) selectCharacter(keep.id);
@@ -763,14 +775,16 @@ function renderCharSelect() {
 }
 
 function selectCharacter(id) {
-  setupChoice = CHARACTER_CARDS.find(c => c.id === id);
+  const c = CHARACTER_CARDS.find(c => c.id === id);
+  if (!c?.isUnlocked) return;
+  setupChoice = c;
   document.querySelectorAll('.char-option').forEach(el =>
     el.classList.toggle('selected', el.dataset.id === id));
 }
 
 function randomFreeCharacter() {
   const taken = setupPlayers.map(p => p.character.id);
-  const free  = CHARACTER_CARDS.filter(c => !taken.includes(c.id));
+  const free  = pickableCharacters().filter(c => !taken.includes(c.id));
   return free[Math.floor(Math.random() * free.length)];
 }
 
@@ -1065,6 +1079,7 @@ async function startTurn() {
                { force: true, kicker: 'It\'s your turn', button: `I'm ${p.name}, show my cards` });
   p.frozenThisTurn = p.frozen;
   p.frozen = false;
+  try { await lennyCheck(); } catch (e) { if (!(e instanceof GameOver)) console.error(e); }
   if (p.isBot) {
     renderAll();
     try { await runBotTurn(p); }
@@ -1095,6 +1110,7 @@ async function runBotTurn(p) {
     renderAll();
     await ABILITIES[p.character.id](p);
     renderAll();
+    await lennyCheck();
     await sleep(BOT_PACE.step);
   }
   // First the Whoopsies waiting on its table, then its own flip
@@ -1173,7 +1189,7 @@ function renderMain() {
     else if (G.flippedThisTurn) btns.appendChild(btnEl(G.actionDeck.size ? '✋ End turn (draw 1)' : '✋ End turn', 'btn-green btn-big', onEndTurn));
     else btns.appendChild(btnEl('⚠️ Flip a Whoopsies!', 'btn-red btn-big', onFlip));
     const a = p.character;
-    if (a.timing === TIMING.YOUR_TURN && a.id !== 'c_casey') {
+    if (a.hasTurnButton) {
       const check = canUseTurnAbility(p);
       const b = btnEl(`✨ ${a.name} (${p.abilitiesLeft} left)`, 'btn-purple', onAbility);
       b.disabled = !check.ok;
@@ -1315,6 +1331,12 @@ async function onHandCardClick(card) {
  * Returns the effect's result ('negated', 'end_turn', …) or 'cancelled'.
  */
 async function playAction(player, card) {
+  const result = await playActionInner(player, card);
+  await lennyCheck();   // hands can shrink (Take 1, Swap, Cancel…): Lenny may top up
+  return result;
+}
+
+async function playActionInner(player, card) {
   player.removeFromHand(card.instanceId);
   G.actionDeck.discard(card);
   if (player.id === G.currentPlayerIdx) G.actionsThisTurn++;
@@ -1557,6 +1579,11 @@ function canUseTurnAbility(p) {
     case 'c_fester':
       if (!p.hand.length) return { ok: false, reason: 'You need a card to discard.' };
       return others.some(o => G.canReceive(o)) ? { ok: true } : { ok: false, reason: 'Everyone has faced 2 Whoopsies from others already.' };
+    case 'c_leo':
+      if (!p.hand.length) return { ok: false, reason: 'You need a card to discard.' };
+      if (!G.whoopsiesDeck.discardSize) return { ok: false, reason: 'The Whoopsies discard pile is empty.' };
+      if (G.currentWhoopsies && G.leoUsedOn === G.currentWhoopsies.instanceId) return { ok: false, reason: 'Already used on this Whoopsies.' };
+      return others.some(o => G.canReceive(o)) ? { ok: true } : { ok: false, reason: 'Everyone has 2 Whoopsies waiting already.' };
     default:
       return { ok: true };
   }
@@ -1573,6 +1600,8 @@ function onAbility() {
     G.addLog(`✨ ${p.name} uses ${p.character.name}.`);
     renderAll();
     await ABILITIES[p.character.id](p);
+    renderAll();
+    await lennyCheck();
   });
 }
 
@@ -1640,7 +1669,65 @@ const ABILITIES = {
     renderAll();
     await redirectAlert(t, `${p.name}'s Fester the Cat dealt you a Whoopsies`, w);
   },
+
+  // 👑 Leo the Lion: discard a card, then hand someone any Whoopsies from the discard pile
+  async c_leo(p) {
+    if (G.currentWhoopsies) G.leoUsedOn = G.currentWhoopsies.instanceId;   // once per Whoopsies
+    const card = await pickFromHand(p, 'Leo the Lion 🦁', 'Discard a card to send a Whoopsies from the discard pile.');
+    p.removeFromHand(card.instanceId);
+    G.actionDeck.discard(card);
+    const others = G.activePlayers.filter(o => o.id !== p.id && G.canReceive(o));
+    const t = await pickPlayer('Leo the Lion 🦁', 'Who gets a Whoopsies from the discard pile?', others, { who: p });
+    const pile = G.whoopsiesDeck.getAllDiscards();
+    const id = p.isBot
+      ? [...pile].sort((a, b) => (Bot.harm(b, t) - Bot.harm(a, t)) || (Math.random() - .5))[0].instanceId
+      : await ask({ who: p, kicker: 'Leo the Lion 🦁', title: `Pick a Whoopsies for ${t.name}`, wide: pile.length > 3,
+                    body: 'Any card from the Whoopsies discard pile. It waits on their table until their turn.',
+                    cards: pile.map(c => ({ card: c, value: c.instanceId })) });
+    const w = G.whoopsiesDeck.recoverFromDiscard(id) ?? G.whoopsiesDeck.recoverFromDiscard(pile[0].instanceId);
+    G.addLog(`🦁 ${p.name} (Leo the Lion) rolls the dice: "${w.name}" from the discard pile goes to ${t.name}!`, 'redirect');
+    t.table.push({ card: w, why: `${p.name}'s Leo the Lion dealt it` });
+    renderAll();
+    await redirectAlert(t, `${p.name}'s Leo the Lion dealt you a Whoopsies from the discard pile`, w);
+  },
 };
+
+// 🦈 Lenny the Shark (Reaction): whenever you have fewer than 3 cards
+// in your hand, you may draw 1 from the Action deck. Called after
+// anything that can shrink a hand. If you say no, it asks again only
+// once your hand gets even smaller.
+let lennyBusy = false;
+async function lennyCheck() {
+  if (!G || G.winner || lennyBusy) return;
+  lennyBusy = true;
+  try {
+    for (const p of G.activePlayers) {
+      if (p.character.id !== 'c_lenny') continue;
+      if (p.hand.length >= 3) { p.lennyQuiet = null; continue; }
+      if (!p.canUseAbility() || !G.actionDeck.size) continue;
+      if (p.lennyQuiet != null && p.hand.length >= p.lennyQuiet) continue;
+      const yes = p.isBot ? Bot.wantsLenny(p) : await yesNo('Lenny the Shark 🦈',
+        `${p.name}, you have ${p.hand.length} card${p.hand.length === 1 ? '' : 's'}. Draw 1 Action card? (${p.abilitiesLeft} use${p.abilitiesLeft === 1 ? '' : 's'} left)`,
+        'Draw!', 'Save it', { kicker: 'Reaction', cards: [{ card: p.character }], single: true, who: p });
+      if (!yes) { p.lennyQuiet = p.hand.length; continue; }
+      p.useAbility();
+      const c = G.actionDeck.draw();
+      if (!c) continue;
+      p.hand.push(c);
+      p.lennyQuiet = null;
+      G.addLog(`🦈 ${p.name} (Lenny the Shark) draws 1 Action card.`);
+      toast(`🦈 ${p.name} uses Lenny the Shark: +1 card!`, p.character);
+      SFX.flip();
+      renderAll();
+      // Only show the card where nobody else is looking at the same screen
+      if (!p.isBot && (NET.on || G.humans.length === 1)) {
+        await info('Lenny the Shark 🦈', `${c.name} goes into your hand.`, { kicker: 'You drew…', cards: [{ card: c }], who: p, auto: 2400 });
+      }
+    }
+  } finally {
+    lennyBusy = false;
+  }
+}
 
 // =============================================================
 //  FACING A WHOOPSIES
@@ -1651,6 +1738,7 @@ async function faceWhoopsies(card, targetIdx, { revealed = false, passedBear = f
   G.whoopsiesTargetIdx = targetIdx;
   G.sentAway           = false;        // set when it's sent to someone's table
   G.currentPassedBear  = passedBear;   // a bear that was already passed can't be passed again
+  G.leoUsedOn          = null;         // Leo the Lion: once per Whoopsies
   G.addLog(`⚠️ Whoopsies! ${G.whoopsiesTarget.name} faces "${card.name}".`, 'whoops');
   renderAll();
   if (!revealed) await revealWhoopsies(card, G.whoopsiesTarget);
@@ -1665,6 +1753,7 @@ async function faceWhoopsies(card, targetIdx, { revealed = false, passedBear = f
   G.currentPassedBear = false;
   renderAll();
   if (!sent) await caseyCheck(resolver);
+  await lennyCheck();
 }
 
 // Before a Whoopsies resolves, anyone may react.
@@ -1729,7 +1818,9 @@ function hasReaction(p) {
   if (p.hand.some(c => canReact(p, c).ok)) return true;
   if (!p.canUseAbility()) return false;
   return (p.character.id === 'c_lou' && p.id === G.currentPlayerIdx) ||
-         (p.character.id === 'c_rosie' && p.id === G.whoopsiesTargetIdx);
+         (p.character.id === 'c_rosie' && p.id === G.whoopsiesTargetIdx) ||
+         (p.character.id === 'c_leo' && canUseTurnAbility(p).ok) ||
+         (p.character.id === 'c_lenny' && p.hand.length < 3 && G.actionDeck.size > 0);
 }
 
 function canReact(reactor, c) {
@@ -1775,6 +1866,8 @@ async function reactorTurn(reactor) {
   if (reactor.canUseAbility()) {
     if (ch.id === 'c_rosie' && isTarget) abilityButtons.push({ label: `🎲 Reckless Rosie (${reactor.abilitiesLeft} left)`, cls: 'btn-purple', value: 'rosie' });
     if (ch.id === 'c_lou' && reactor.id === G.currentPlayerIdx) abilityButtons.push({ label: `🥊 Grumpy Lou: swap it (${reactor.abilitiesLeft} left)`, cls: 'btn-purple', value: 'lou' });
+    if (ch.id === 'c_leo' && canUseTurnAbility(reactor).ok) abilityButtons.push({ label: `🦁 Leo the Lion: deal a Whoopsies (${reactor.abilitiesLeft} left)`, cls: 'btn-purple', value: 'leo' });
+    if (ch.id === 'c_lenny' && reactor.hand.length < 3 && G.actionDeck.size) abilityButtons.push({ label: `🦈 Lenny: draw 1 (${reactor.abilitiesLeft} left)`, cls: 'btn-purple', value: 'lenny' });
   }
 
   const v = await ask({ who: reactor,
@@ -1788,7 +1881,7 @@ async function reactorTurn(reactor) {
   });
 
   if (v === 'back' || v === undefined) return 'none';
-  return doReaction(reactor, v === 'rosie' || v === 'lou'
+  return doReaction(reactor, ['rosie', 'lou', 'leo', 'lenny'].includes(v)
     ? { type: v }
     : { type: 'card', card: reactor.hand.find(c => c.instanceId === v) });
 }
@@ -1821,6 +1914,29 @@ async function doReaction(reactor, choice) {
     toast(`🥊 ${reactor.name} uses Grumpy Lou!`, reactor.character);
     renderAll();
     await revealWhoopsies(fresh, G.whoopsiesTarget);
+    return 'none';
+  }
+
+  if (choice.type === 'leo') {
+    reactor.useAbility();
+    G.addLog(`✨ ${reactor.name} uses Leo the Lion.`);
+    toast(`🦁 ${reactor.name} uses Leo the Lion!`, reactor.character);
+    renderAll();
+    await ABILITIES.c_leo(reactor);
+    renderAll();
+    await lennyCheck();
+    return 'none';   // the Whoopsies on the table still resolves
+  }
+
+  if (choice.type === 'lenny') {
+    reactor.useAbility();
+    const c = G.actionDeck.draw();
+    if (c) reactor.hand.push(c);
+    reactor.lennyQuiet = null;
+    G.addLog(`🦈 ${reactor.name} (Lenny the Shark) draws 1 Action card.`);
+    toast(`🦈 ${reactor.name} uses Lenny the Shark: +1 card!`, reactor.character);
+    SFX.flip();
+    renderAll();
     return 'none';
   }
 

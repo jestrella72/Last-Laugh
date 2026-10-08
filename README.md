@@ -19,9 +19,9 @@ Then open http://localhost:8090.
 ### 🏆 Story mode
 
 Tap **🏆 Story mode**, pick your hero, and beat every other character in **1-on-1 duels**, easiest first:
-Naive Nina → Cautious Casey → Bold Bella → Curious Carl → Melo Mel → Prankster Pete → Lucky Luke → Reckless Rosie → Franky Ice → Grumpy Lou → Slick Rick → **👑 final boss: Fester the Cat** (if you play as Fester, Slick Rick is the boss).
+Naive Nina → Cautious Casey → Bold Bella → Curious Carl → Melo Mel → Prankster Pete → Lenny the Shark → Lucky Luke → Reckless Rosie → Franky Ice → Grumpy Lou → Slick Rick → **👹 mini-boss: Fester the Cat** → **👑 final boss: Leo the Lion** (if you play as Leo, Fester is the final boss).
 
-Each level gets harder: the bot plays smarter, has more lives (2 → 3), and later starts with bonus cards and extra ability uses. The final boss has 4 lives, 4 bonus cards, 2 extra ability uses and plays perfectly. Your progress is saved on your device. **Lose a duel and you get one more try; lose again and the story starts over from level 1** (same hero). Beating a level gives you a fresh retry for the next one. Leaving a duel with 🏳️ counts as a loss.
+Each level gets harder: the bot plays smarter, has more lives (2 → 3), and later starts with bonus cards and extra ability uses. The mini-boss has 3 lives, 3 bonus cards and 1 extra ability use. The final boss, Leo the Lion, is **very hard**: 5 lives, 5 bonus cards, 3 extra ability uses (6 total), perfect play, and his own dark tango soundtrack. **Beat Leo to unlock him** as a playable boss card in every mode (story, solo test, local and online). Your progress is saved on your device. **Lose a duel and you get one more try; lose again and the story starts over from level 1** (same hero). Beating a level gives you a fresh retry for the next one. Leaving a duel with 🏳️ counts as a loss.
 
 ### 🌐 Playing online (everyone on their own phone)
 
@@ -69,7 +69,7 @@ Good to know:
 | 🟦 Play At Any Time | Whenever it makes sense |
 | 🟥 Reaction | In response to something (a Whoopsies, an Action card, a Take 1…) |
 
-**You only face Whoopsies on your own turn.** Everyone has a **table**. A Whoopsies sent to you (Redirect, Slip Away, the bear, Out of Luck!!, Fester) lands face-up on your table and waits there. On your turn you face the ones on your table first (you can play cards before each), then flip your own. A table holds **at most 2**, so the most you face in a turn is 2 + your own flip. Only the player whose turn it is flips; Grumpy Lou's swap only works on Lou's own turn.
+**You only face Whoopsies on your own turn.** Everyone has a **table**. A Whoopsies sent to you (Redirect, Slip Away, the bear, Out of Luck!!, Fester, Leo) lands face-up on your table and waits there. On your turn you face the ones on your table first (you can play cards before each), then flip your own. A table holds **at most 2**, so the most you face in a turn is 2 + your own flip. Only the player whose turn it is flips; Grumpy Lou's swap only works on Lou's own turn.
 
 **Tried to hug a bear:** when you flip it, you may pass it to another player's table (or keep it and lose 1 life). Whoever gets it faces it on their turn and **can't pass it again**: they lose 1 life unless a card like Not Today!, Redirect or Second Chance saves them.
 
@@ -89,7 +89,10 @@ Good to know:
 
 **Action (43):** Not Today! ×5 (Play At Any Time), Slip Away ×4, Redirect ×4, Second Chance ×4, Cancel ×4, Peek Ahead ×4, Safety First ×2, Take 1 ×5, Swap Hands ×2, Skip Your Turn ×2, Draw 2 ×4, Double Trouble ×2, Recover ×1
 
-**Characters (12):** Curious Carl, Cautious Casey, Prankster Pete, Bold Bella, Lucky Luke, Naive Nina, Reckless Rosie, Melo Mel, Franky Ice, Grumpy Lou, Slick Rick, Fester the Cat
+**Characters (13 + 1 boss):** Curious Carl, Cautious Casey, Prankster Pete, Bold Bella, Lucky Luke, Naive Nina, Reckless Rosie, Melo Mel, Franky Ice, Grumpy Lou, Slick Rick, Fester the Cat, Lenny the Shark, and the locked 👑 boss card **Leo the Lion**
+
+- **Lenny the Shark 🦈** (Reaction, 3 uses): whenever your hand drops below 3 cards, the game offers you 1 free Action card draw. Say no and it only asks again once your hand gets even smaller. You can also use it from the React menu (handy before "Tried to pet a shark" resolves).
+- **Leo the Lion 🦁** (Boss card, Play At Any Time, 3 uses): discard a card, pick a player, then pick ANY Whoopsies from the discard pile to put on their table. Use it on your turn or while someone is facing a Whoopsies (once per Whoopsies). Locked until you beat Story mode on that device.
 
 Card counts are set in `cards.js`. Change the `copies` number to rebalance.
 

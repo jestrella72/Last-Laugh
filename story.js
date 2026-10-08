@@ -3,7 +3,8 @@
 //
 //  Pick a hero and beat every other character in 1-on-1 duels,
 //  easiest first. Each level is harder (smarter bot, more lives,
-//  bonus cards). The final boss is Fester the Cat, the card shark.
+//  bonus cards). Fester the Cat is the mini-boss, and the final boss
+//  is 👑 Leo the Lion, who runs the casino. Beat Leo to unlock him.
 //  Progress is saved on this device so you can continue later.
 //  Lose a duel and you get ONE more try at it; lose again and the
 //  story starts over from level 1 (same hero).
@@ -13,9 +14,14 @@
 //  engine doesn't need to know story mode exists.
 // =============================================================
 
-const STORY_ORDER = ['c_nina', 'c_casey', 'c_bella', 'c_carl', 'c_mel', 'c_pete',
-                     'c_luke', 'c_rosie', 'c_franky', 'c_lou', 'c_rick'];
-const STORY_BOSS  = 'c_fester';
+const STORY_ORDER = ['c_nina', 'c_casey', 'c_bella', 'c_carl', 'c_mel', 'c_pete', 'c_lenny',
+                     'c_luke', 'c_rosie', 'c_franky', 'c_lou', 'c_rick', 'c_fester'];
+const STORY_BOSS  = 'c_leo';
+const STORY_VERSION = 2;
+
+// The ladder before Lenny and Leo joined (used to move old saves over)
+const STORY_ORDER_V1 = ['c_nina', 'c_casey', 'c_bella', 'c_carl', 'c_mel', 'c_pete',
+                        'c_luke', 'c_rosie', 'c_franky', 'c_lou', 'c_rick'];
 
 const STORY_TAUNTS = {
   c_nina:   "Ooh, can I see your cards? Pretty please?",
@@ -29,7 +35,9 @@ const STORY_TAUNTS = {
   c_franky: "Chill out. You only get ONE card this turn.",
   c_lou:    "I don't like that Whoopsies. Try another one.",
   c_rick:   "Nice card. I'll take one of those too.",
-  c_fester: "Welcome to my table. The house always gets the Last Laugh.",
+  c_lenny:  "Running low on cards? Funny, I never do.",
+  c_fester: "Deal me in. One of us is getting a Whoopsies, and it isn't me.",
+  c_leo:    "Welcome to MY casino, kid. The house always gets the Last Laugh.",
 };
 
 const STORY = {
@@ -38,7 +46,29 @@ const STORY = {
 
   // ── saved progress ───────────────────────────────────────
   load() {
-    try { return JSON.parse(localStorage.getItem('ll-story')) || null; } catch { return null; }
+    let p;
+    try { p = JSON.parse(localStorage.getItem('ll-story')) || null; } catch { return null; }
+    if (p && p.v !== STORY_VERSION) p = this.migrate(p);
+    return p;
+  },
+
+  // Old saves (before Lenny + Leo): keep the player on the same opponent.
+  // Anyone who had finished the old story is sent straight to the new
+  // final boss, Leo the Lion.
+  migrate(p) {
+    const oldBoss = p.heroId === 'c_fester' ? 'c_rick' : 'c_fester';
+    const oldIds  = [...STORY_ORDER_V1.filter(id => id !== p.heroId && id !== oldBoss), oldBoss];
+    const newIds  = this.ladder(p.heroId).map(lv => lv.opp.id);
+    if (p.done) {
+      p.level = Math.min(newIds.indexOf(oldBoss) + 1, newIds.length - 1);
+      p.done = false;
+    } else {
+      const i = newIds.indexOf(oldIds[p.level]);
+      p.level = i === -1 ? 0 : i;
+    }
+    p.v = STORY_VERSION;
+    this.save(p);
+    return p;
   },
   save(p) {
     try { localStorage.setItem('ll-story', JSON.stringify(p)); } catch {}
@@ -47,13 +77,19 @@ const STORY = {
     try { localStorage.removeItem('ll-story'); } catch {}
   },
 
-  // The opponents for a hero, in order; the last one is the final boss
+  // The opponents for a hero, in order. The second-to-last is the
+  // mini-boss and the last one is the final boss (Leo the Lion; if you
+  // play AS Leo, Fester the Cat takes his place).
   ladder(heroId) {
-    const boss = heroId === STORY_BOSS ? 'c_rick' : STORY_BOSS;
+    const boss = heroId === STORY_BOSS ? 'c_fester' : STORY_BOSS;
     const ids = STORY_ORDER.filter(id => id !== heroId && id !== boss);
     const n = ids.length;
     const levels = ids.map((id, i) => {
-      const t = n > 1 ? i / (n - 1) : 1;       // 0 = first level … 1 = last before the boss
+      const t = n > 1 ? i / (n - 1) : 1;       // 0 = first level … 1 = the mini-boss
+      if (i === n - 1) {                        // 👹 mini-boss: a tough warm-up for the final boss
+        return { opp: CHARACTER_CARDS.find(c => c.id === id),
+                 botLives: 3, bonusCards: 3, bonusUses: 1, skill: 1, boss: false, mini: true };
+      }
       return {
         opp: CHARACTER_CARDS.find(c => c.id === id),
         botLives: i < 4 ? 2 : 3,
@@ -63,10 +99,10 @@ const STORY = {
         boss: false,
       };
     });
-    levels.push({
-      opp: CHARACTER_CARDS.find(c => c.id === boss),
-      botLives: 4, bonusCards: 4, bonusUses: 2, skill: 1, boss: true,
-    });
+    // 👑 Final boss. Leo is VERY hard: 5 lives, 5 bonus cards, 6 ability uses, perfect play.
+    levels.push(boss === 'c_leo'
+      ? { opp: CHARACTER_CARDS.find(c => c.id === boss), botLives: 5, bonusCards: 5, bonusUses: 3, skill: 1, boss: true }
+      : { opp: CHARACTER_CARDS.find(c => c.id === boss), botLives: 4, bonusCards: 4, bonusUses: 2, skill: 1, boss: true });
     return levels;
   },
 
@@ -91,7 +127,7 @@ const STORY = {
 
   begin(name, hero) {
     try { localStorage.setItem('ll-name', name); } catch {}
-    const prog = { name, heroId: hero.id, level: 0, done: false, lastChance: false };
+    const prog = { v: STORY_VERSION, name, heroId: hero.id, level: 0, done: false, lastChance: false };
     this.save(prog);
     this.renderMap(prog);
   },
@@ -114,10 +150,10 @@ const STORY = {
       row.className = `story-level ${state}${lv.boss ? ' boss' : ''}`;
       const hidden = state === 'locked' && lv.boss;
       row.innerHTML = `
-        <div class="story-num">${lv.boss ? '👑' : i + 1}</div>
+        <div class="story-num">${lv.boss ? '👑' : lv.mini ? '👹' : i + 1}</div>
         <div class="portrait" style="${hidden ? '' : portraitStyle(lv.opp)}">${hidden ? '❓' : ''}</div>
         <div class="story-who">
-          <b>${hidden ? 'Final boss: ???' : esc(lv.opp.name)}${lv.boss && !hidden ? ' · FINAL BOSS' : ''}</b>
+          <b>${hidden ? 'Final boss: ???' : esc(lv.opp.name)}${lv.boss && !hidden ? ' · FINAL BOSS' : lv.mini ? ' · MINI-BOSS' : ''}</b>
           <span>${'❤️'.repeat(lv.botLives)}${lv.bonusCards ? ` · +${lv.bonusCards} cards` : ''}${lv.bonusUses ? ` · +${lv.bonusUses} ability` : ''}</span>
         </div>
         <div class="story-state">${state === 'beaten' ? '✅' : state === 'next' ? '▶' : '🔒'}</div>`;
@@ -140,8 +176,9 @@ const STORY = {
 
   async intro(prog, i) {
     const lv = this.ladder(prog.heroId)[i];
+    if (lv.boss) SFX.setTrack('boss');   // the final boss music starts on his intro
     const go = await askLocal({
-      kicker: lv.boss ? '👑 FINAL BOSS' : `Level ${i + 1}`,
+      kicker: lv.boss ? '👑 FINAL BOSS' : lv.mini ? `👹 MINI-BOSS · Level ${i + 1}` : `Level ${i + 1}`,
       title: lv.opp.name, single: true,
       cards: [{ card: lv.opp }],
       html: `<p class="story-taunt">“${esc(STORY_TAUNTS[lv.opp.id])}”</p>
@@ -151,6 +188,7 @@ const STORY = {
                 { label: 'Not yet', cls: 'btn-plain', value: false }],
     });
     if (go) this.play(prog, i);
+    else SFX.setTrack('menu');
   },
 
   play(prog, i) {
@@ -176,11 +214,11 @@ const STORY = {
     bot.abilitiesLeft += lv.bonusUses;
     Bot.skill = lv.skill;
     Bot.focusPeople = true;   // story bots always come after you
-    game.addLog(`🏆 Story · ${lv.boss ? 'FINAL BOSS' : `Level ${this.level + 1}`}: ${bot.name} — “${STORY_TAUNTS[bot.character.id]}”`, 'turn');
+    game.addLog(`🏆 Story · ${lv.boss ? 'FINAL BOSS' : lv.mini ? 'MINI-BOSS' : `Level ${this.level + 1}`}: ${bot.name} — “${STORY_TAUNTS[bot.character.id]}”`, 'turn');
   },
 
   label() {
-    return this.active ? `🏆 ${this.cfg.boss ? 'Final boss' : `Level ${this.level + 1}`} · ` : '';
+    return this.active ? `🏆 ${this.cfg.boss ? 'Final boss' : this.cfg.mini ? 'Mini-boss' : `Level ${this.level + 1}`} · ` : '';
   },
 
   // Called instead of the normal winner screen
@@ -201,9 +239,13 @@ const STORY = {
       prog.lastChance = false;   // a fresh retry for the next level
       this.save(prog);
       if (last) {
+        const leo = CHARACTER_CARDS.find(c => c.id === STORY_BOSS);
+        const fresh = !leo.isUnlocked;
+        leo.unlock();
         showWinner(true);
         $('winner-title').textContent = '🏆 YOU GOT THE LAST LAUGH!';
-        $('winner-msg').textContent = `${prog.name} beat all ${levels.length} opponents, final boss included. Legend!`;
+        $('winner-msg').textContent = `${prog.name} beat all ${levels.length} opponents, final boss included. Legend!` +
+          (fresh ? ' 🔓 Leo the Lion is unlocked: pick him in any game!' : '');
         $('winner-again').textContent = 'Back to the menu';
         return;
       }
@@ -211,7 +253,7 @@ const STORY = {
       const v = await askLocal({
         kicker: '🎉 Level cleared!', title: `You beat ${levels[this.level].opp.name}!`,
         cards: [{ card: next.opp }], single: true,
-        body: `Next up: ${next.boss ? 'the FINAL BOSS, ' : ''}${next.opp.name}.`,
+        body: `Next up: ${next.boss ? 'the FINAL BOSS, ' : next.mini ? 'the MINI-BOSS, ' : ''}${next.opp.name}.`,
         buttons: [{ label: `▶ Next: ${next.opp.name}`, cls: 'btn-yellow btn-big', value: 'next' },
                   { label: 'Story map', cls: 'btn-plain', value: 'map' }],
       });

@@ -94,14 +94,37 @@ class ActionCard extends Card {
 
 class CharacterCard extends Card {
   // uses = how many ace icons are printed on the card
-  constructor(id, name, image, uses, timing, abilityText) {
+  // extra (optional): { boss, locked, portrait }
+  //   boss     — a Boss Card (gold frame)
+  //   locked   — has to be unlocked before you can pick it
+  //   portrait — CSS background-position for the round portrait
+  constructor(id, name, image, uses, timing, abilityText, extra = {}) {
     super(id, name, 'character', image, 1);
     this.uses        = uses;
     this.timing      = timing;
     this.abilityText = abilityText;
+    this.boss        = !!extra.boss;
+    this.locked      = !!extra.locked;
+    this.portrait    = extra.portrait || '';
   }
 
   get timingLabel() { return TIMING_LABEL[this.timing]; }
+
+  // Does this character get an ability button on its own turn?
+  // (Casey triggers by herself; Leo can be used any time, so on your turn too.)
+  get hasTurnButton() {
+    return (this.timing === TIMING.YOUR_TURN && this.id !== 'c_casey') || this.id === 'c_leo';
+  }
+
+  // Locked cards (Leo the Lion) unlock by beating Story mode on this device
+  get isUnlocked() {
+    if (!this.locked) return true;
+    try { return localStorage.getItem(`ll-unlock-${this.id}`) === '1'; } catch { return false; }
+  }
+
+  unlock() {
+    try { localStorage.setItem(`ll-unlock-${this.id}`, '1'); } catch {}
+  }
 
   describe() { return `👤 ${this.name} (${this.uses} uses): ${this.abilityText}`; }
 }
@@ -221,7 +244,19 @@ const CHARACTER_CARDS = [
 
   new CharacterCard('c_fester', 'Fester the Cat', IMG + 'c-fester.webp', 3, TIMING.YOUR_TURN,
     'Discard a card from your hand to give a player a Whoopsies card from the top of the deck.'),
+
+  new CharacterCard('c_lenny', 'Lenny the Shark', IMG + 'c-lenny.webp', 3, TIMING.REACTION,
+    'Whenever you have fewer than 3 cards in your hand, you may draw 1 card from the Action deck.',
+    { portrait: '71% 35%' }),
+
+  // 👑 Boss card: the final boss of Story mode. Beat him to unlock him.
+  new CharacterCard('c_leo', 'Leo the Lion', IMG + 'c-leo.webp', 3, TIMING.ANY_TIME,
+    'Discard a card from your hand to give a player a Whoopsies card from the discard pile.',
+    { boss: true, locked: true, portrait: '55% 17%' }),
 ];
+
+// Characters this device is allowed to pick (locked ones stay out until unlocked)
+const pickableCharacters = () => CHARACTER_CARDS.filter(c => c.isUnlocked);
 
 const CARD_BACKS = {
   action:    IMG + 'back-action.webp',

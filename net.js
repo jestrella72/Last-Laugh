@@ -239,7 +239,7 @@ const NET = {
   addBot() {
     if (this.seats.length >= MAX_SEATS) return;
     const taken = this.seats.map(s => s.charId);
-    const free = CHARACTER_CARDS.filter(c => !taken.includes(c.id));
+    const free = pickableCharacters().filter(c => !taken.includes(c.id));
     const c = free[Math.floor(Math.random() * free.length)];
     this.seats.push({ name: this.uniqueName(`Bot ${BOT_NAMES[c.id]}`), charId: c.id, isBot: true });
     this.broadcastLobby();
@@ -367,7 +367,7 @@ const NET = {
     const myTurn = G.currentPlayerIdx === pid && !G.winner && !p.isBot;
     const a = p.character;
     let ability = null;
-    if (a.timing === TIMING.YOUR_TURN && a.id !== 'c_casey') {
+    if (a.hasTurnButton) {
       const chk = canUseTurnAbility(p);
       ability = { label: `✨ ${a.name} (${p.abilitiesLeft} left)`, ok: myTurn && !busy && chk.ok, reason: chk.reason || '' };
     }

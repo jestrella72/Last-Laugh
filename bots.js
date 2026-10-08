@@ -105,6 +105,7 @@ class Bot {
       case 'c_bella':  return Bot.coin(.5);
       case 'c_nina':   return Bot.coin(.75);
       case 'c_franky': return Bot.coin(.85);
+      case 'c_leo':    return bot.hand.length >= 2 && Bot.coin(.85);
       default:         return false;
     }
   }
@@ -123,7 +124,7 @@ class Bot {
   }
 
   // ── Reacting to a Whoopsies ───────────────────────────────
-  // Returns { type: 'card', card } | { type: 'rosie' } | { type: 'lou' } | null
+  // Returns { type: 'card', card } | { type: 'rosie' | 'lou' | 'leo' } | null
   static reaction(bot) {
     if (!Bot.sharp()) return null;   // weaker bots sometimes forget to react
     const w = G.currentWhoopsies;
@@ -147,6 +148,10 @@ class Bot {
         if (harm >= .45 && bot.canUseAbility() && bot.character.id === 'c_rosie') return { type: 'rosie' };
         if (harm >= .45 && bot.canUseAbility() && bot.character.id === 'c_lou' && bot.id === G.currentPlayerIdx) return { type: 'lou' };
       }
+    }
+    // Leo the Lion piles on: while someone else faces a Whoopsies, deal them another one
+    if (bot.character.id === 'c_leo' && !isTarget && bot.hand.length >= 2 && canUseTurnAbility(bot).ok && Bot.coin(.45)) {
+      return { type: 'leo' };
     }
     // Second Chance is best saved for the moment a life is about to go
     if (has('a_second_chance') && bot.lives <= bot.maxLives - 2) return { type: 'card', card: has('a_second_chance') };
@@ -193,6 +198,9 @@ class Bot {
   static wantsCopy(card) {
     return ['a_draw2', 'a_take1', 'a_second_chance', 'a_recover', 'a_peek'].includes(card.id);
   }
+
+  // Lenny the Shark: a free card is (almost) always worth it
+  static wantsLenny(bot) { return bot.hand.length <= 1 || Bot.sharp(); }
 
   static wantsToSave(bot) { return bot.hand.length >= 5 && Bot.coin(.2); }
 
