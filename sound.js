@@ -1,8 +1,8 @@
 // =============================================================
 //  LAST LAUGH — Sound
-//  Menu music is a recorded big band track (sounds/menu-bigband.mp3).
-//  Match and boss music are synthesized with the Web Audio API, so
-//  there's no file to download for them. Plus sound effects.
+//  Menu and match music are recorded tracks (sounds/menu-bigband.mp3,
+//  sounds/match-jazz.mp3). The final boss tango is synthesized with the
+//  Web Audio API, so there's no file for it. Plus sound effects.
 //
 //  OOP LESSON: SoundManager hides every Web Audio detail behind
 //  a few simple methods: startMusic(), toggleMusic(), fahhh()…
@@ -53,8 +53,10 @@ class SoundManager {
         { 0: 5, 1: 4, 3: 3, 4: 2, 7: 1 },
       ],
     },
-    // Matches: a sneaky minor-key "cartoon chase" with a walking bass
+    // Matches: a recorded late-night jazz track (looped). The synth
+    // "cartoon chase" below is only a backup while the file loads.
     match: {
+      file: 'sounds/match-jazz.mp3', fileVolume: 1.0,
       bpm: 184, bass: 'walk', lead: 'reed', drums: 'tick', leadLen: 0.7,
       progression: ['Am','Am','Dm','Dm','Am','Am','E7','E7', 'F','F','Dm','E7','Am','Dm','E7','Am'],
       riffs: [
