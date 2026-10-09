@@ -23,9 +23,25 @@ const esc   = s  => String(s).replace(/[&<>"']/g,
 
 // Unlock audio on the first tap anywhere (browsers require it;
 // iPhones want it on touchend, so listen for all of them)
-for (const ev of ['pointerdown', 'touchend', 'click', 'keydown']) {
+for (const ev of ['pointerdown', 'touchstart', 'touchend', 'mousedown', 'click', 'keydown']) {
   document.addEventListener(ev, () => SFX.unlock(), { passive: true });
 }
+
+// Start the music the moment the page opens. Some browsers allow it right
+// away; most keep sound locked until the first tap, so the music is already
+// queued and starts on that tap, with a small hint until then.
+SFX.unlock();
+(function soundHint() {
+  const hint = $('sound-hint');
+  if (!hint || !(window.AudioContext || window.webkitAudioContext)) return;
+  const check = () => {
+    const waiting = SFX.musicOn && SFX.audioState !== 'running';
+    hint.classList.toggle('show', waiting);
+    if (!waiting) clearInterval(timer);
+  };
+  const timer = setInterval(check, 250);
+  check();
+})();
 
 const botTurn = () => G && G.currentPlayer.isBot;
 

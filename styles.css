@@ -961,3 +961,14 @@ body.t-lock { overflow: hidden; }
 @media (prefers-reduced-motion: reduce) {
   #tutorial-screen *, #tutorial-screen *::before { animation: none !important; }
 }
+
+/* ── "Tap to start the music" hint ───────────────────────── */
+#sound-hint {
+  position: fixed; left: 50%; bottom: max(14px, env(safe-area-inset-bottom));
+  transform: translate(-50%, 20px); opacity: 0; pointer-events: none; z-index: 90;
+  background: var(--ink); color: #fff; font-weight: 800; font-size: .9rem;
+  border-radius: 999px; padding: 9px 16px; box-shadow: 3px 3px 0 var(--yellow);
+  transition: opacity .3s, transform .3s; white-space: nowrap;
+}
+#sound-hint.show { opacity: 1; transform: translate(-50%, 0); animation: hintBob 1.4s ease-in-out infinite alternate; }
+@keyframes hintBob { to { transform: translate(-50%, -6px); } }
