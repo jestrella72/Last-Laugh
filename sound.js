@@ -1,7 +1,8 @@
 // =============================================================
 //  LAST LAUGH — Sound
-//  A ragtime piano loop (synthesized with the Web Audio API, so
-//  there's no music file to download) plus sound effects.
+//  Menu music is a recorded big band track (sounds/menu-bigband.mp3).
+//  Match and boss music are synthesized with the Web Audio API, so
+//  there's no file to download for them. Plus sound effects.
 //
 //  OOP LESSON: SoundManager hides every Web Audio detail behind
 //  a few simple methods: startMusic(), toggleMusic(), fahhh()…
@@ -14,6 +15,9 @@ class SoundManager {
   #timer  = null;
   #nextNoteTime = 0;
   #step   = 0;      // eighth-note counter
+  #songs  = {};     // track name → decoded AudioBuffer (recorded tracks)
+  #songSrc = null;  // the recorded track playing right now
+  #songGain = null;
 
   // Recorded sound clips. Each is decoded into Web Audio once sound is
   // unlocked (so it plays on iPhones any time), with <audio> as a fallback.
@@ -36,8 +40,10 @@ class SoundManager {
   //   progression: one chord per bar (8 eighth-notes per bar)
   //   riffs:       eighth-note slot → chord-tone index for the melody
   static TRACKS = {
-    // Menus: a bouncy ragtime piano
+    // Menus: a recorded 1940s big band track (looped). The synth part
+    // below is only a backup while the file loads or if it can't load.
     menu: {
+      file: 'sounds/menu-bigband.mp3', fileVolume: 0.75,
       bpm: 168, bass: 'stride', lead: 'piano', drums: 'brush', leadLen: 1.6,
       progression: ['C','C','A7','A7','D7','G7','C','G7', 'C','C7','F','Fm','C','A7','D7','G7'],
       riffs: [
@@ -126,8 +132,50 @@ class SoundManager {
         .then(buf => { this.#clips[name].buf = buf; })
         .catch(() => {});
     }
+    for (const [name, tr] of Object.entries(SoundManager.TRACKS)) {
+      if (!tr.file) continue;
+      fetch(tr.file)
+        .then(r => r.arrayBuffer())
+        .then(b => this.#ctx.decodeAudioData(b))
+        .then(buf => {
+          this.#songs[name] = buf;
+          if (this.#timer && this.#track === name) this.#startSong();   // swap the backup for the real thing
+        })
+        .catch(() => {});
+    }
     if (this.musicOn) this.startMusic();
   }
+
+  // ── Recorded tracks ─────────────────────────────────────
+  #startSong() {
+    this.#stopSong();
+    const buf = this.#songs[this.#track];
+    if (!buf || !this.#ctx) return false;
+    const t = this.#ctx.currentTime;
+    this.#songGain = this.#ctx.createGain();
+    this.#songGain.gain.setValueAtTime(0.0001, t);
+    this.#songGain.gain.linearRampToValueAtTime(SoundManager.TRACKS[this.#track].fileVolume ?? 1, t + 0.6);
+    this.#songGain.connect(this.#music);
+    this.#songSrc = this.#ctx.createBufferSource();
+    this.#songSrc.buffer = buf;
+    this.#songSrc.loop = true;
+    this.#songSrc.connect(this.#songGain);
+    this.#songSrc.start(t + 0.05);
+    return true;
+  }
+
+  #stopSong() {
+    if (!this.#songSrc) return;
+    const src = this.#songSrc, g = this.#songGain, t = this.#ctx.currentTime;
+    g.gain.cancelScheduledValues(t);
+    g.gain.setValueAtTime(g.gain.value, t);
+    g.gain.linearRampToValueAtTime(0.0001, t + 0.4);   // quick fade out
+    src.stop(t + 0.45);
+    this.#songSrc = this.#songGain = null;
+  }
+
+  // Is a recorded track playing (so the synth should stay quiet)?
+  get #songPlaying() { return !!this.#songSrc; }
 
   // Handy for checking audio on a phone: SFX.audioState in the console
   get audioState() { return this.#ctx?.state ?? 'locked (tap the screen)'; }
@@ -140,6 +188,7 @@ class SoundManager {
     this.#track = name;
     this.#step = 0;
     if (this.#ctx) this.#nextNoteTime = this.#ctx.currentTime + 0.15;
+    if (this.#timer) this.#startSong() || this.#stopSong();
   }
 
   get track() { return this.#track; }
@@ -148,11 +197,13 @@ class SoundManager {
     if (!this.#ctx || this.#timer) return;
     this.#nextNoteTime = this.#ctx.currentTime + 0.1;
     this.#timer = setInterval(() => this.#schedule(), 25);
+    this.#startSong();
   }
 
   stopMusic() {
     clearInterval(this.#timer);
     this.#timer = null;
+    this.#stopSong();
   }
 
   toggleMusic() {
@@ -173,6 +224,7 @@ class SoundManager {
     const tr = SoundManager.TRACKS[this.#track];
     const eighth = 60 / tr.bpm / 2;
     const now = this.#ctx.currentTime;
+    if (this.#songPlaying) { this.#nextNoteTime = now + 0.05; return; }   // the recording is playing
     // If we fell behind (tab was asleep), skip ahead instead of
     // blasting every missed note at once.
     if (this.#nextNoteTime < now - 0.25) this.#nextNoteTime = now + 0.05;
