@@ -1,8 +1,9 @@
 // =============================================================
 //  LAST LAUGH — Sound
-//  Menu and match music are recorded tracks (sounds/menu-bigband.mp3,
-//  sounds/match-jazz.mp3). The final boss tango is synthesized with the
-//  Web Audio API, so there's no file for it. Plus sound effects.
+//  Menu, story-tour and match music are recorded tracks
+//  (sounds/menu-bigband.mp3, story-swing.mp3, match-jazz.mp3). The final
+//  boss tango is synthesized with the Web Audio API, so there's no file
+//  for it. Plus sound effects.
 //
 //  OOP LESSON: SoundManager hides every Web Audio detail behind
 //  a few simple methods: startMusic(), toggleMusic(), fahhh()…
@@ -16,6 +17,7 @@ class SoundManager {
   #nextNoteTime = 0;
   #step   = 0;      // eighth-note counter
   #songs  = {};     // track name → decoded AudioBuffer (recorded tracks)
+  #songLoads = {};  // track names whose file has been requested
   #songSrc = null;  // the recorded track playing right now
   #songGain = null;
 
@@ -134,18 +136,27 @@ class SoundManager {
         .then(buf => { this.#clips[name].buf = buf; })
         .catch(() => {});
     }
-    for (const [name, tr] of Object.entries(SoundManager.TRACKS)) {
-      if (!tr.file) continue;
-      fetch(tr.file)
-        .then(r => r.arrayBuffer())
-        .then(b => this.#ctx.decodeAudioData(b))
-        .then(buf => {
-          this.#songs[name] = buf;
-          if (this.#timer && this.#track === name) this.#startSong();   // swap the backup for the real thing
-        })
-        .catch(() => {});
-    }
+    // Recorded songs load one at a time, only when needed (about 2 MB each).
+    // The song for the screen you're on loads first; the other two are
+    // fetched quietly a few seconds later so the next screen is ready.
+    this.#loadSong(this.#track);
+    setTimeout(() => this.#loadSong('story'), 5000);
+    setTimeout(() => this.#loadSong('match'), 10000);
     if (this.musicOn) this.startMusic();
+  }
+
+  #loadSong(name) {
+    const tr = SoundManager.TRACKS[name];
+    if (!tr?.file || !this.#ctx || name in this.#songLoads) return;
+    this.#songLoads[name] = true;
+    fetch(tr.file)
+      .then(r => r.arrayBuffer())
+      .then(b => this.#ctx.decodeAudioData(b))
+      .then(buf => {
+        this.#songs[name] = buf;
+        if (this.#timer && this.#track === name) this.#startSong();   // swap the backup for the real thing
+      })
+      .catch(() => { delete this.#songLoads[name]; });   // try again next time
   }
 
   // ── Recorded tracks ─────────────────────────────────────
@@ -184,12 +195,13 @@ class SoundManager {
   get fahhhReady() { return !!this.#clips.fahhh.buf; }
 
   // ── Music ───────────────────────────────────────────────
-  // Switch soundtrack ('menu' | 'match' | 'boss'). Starts from the top.
+  // Switch soundtrack ('menu' | 'story' | 'match' | 'boss'). Starts from the top.
   setTrack(name) {
     if (!SoundManager.TRACKS[name] || name === this.#track) return;
     this.#track = name;
     this.#step = 0;
     if (this.#ctx) this.#nextNoteTime = this.#ctx.currentTime + 0.15;
+    this.#loadSong(name);
     if (this.#timer) this.#startSong() || this.#stopSong();
   }
 
@@ -446,5 +458,9 @@ class SoundManager {
   damage(){ this.#playClip('damage', 3.4); }  // Take 1: "emotional damage"
   laugh() { this.#playClip('laugh', 2.4); }   // Not Today!
 }
+
+// The Last Laugh Tour (story mode) screens: an energetic big band swing track.
+// Until the file loads, the menu's ragtime piano plays as a backup.
+SoundManager.TRACKS.story = { ...SoundManager.TRACKS.menu, file: 'sounds/story-swing.mp3', fileVolume: 0.8 };
 
 const SFX = new SoundManager();

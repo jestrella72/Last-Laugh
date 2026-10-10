@@ -108,6 +108,7 @@ const STORY = {
 
   // ── screens ──────────────────────────────────────────────
   open() {
+    SFX.setTrack('story');
     hideSetupPanels();
     const prog = this.load();
     if (!prog) { this.pickHero(); return; }
@@ -115,6 +116,7 @@ const STORY = {
   },
 
   pickHero() {
+    SFX.setTrack('story');
     setupMode = 'story';
     setupCount = 1;
     setupPlayers = [];
@@ -133,6 +135,7 @@ const STORY = {
   },
 
   renderMap(prog) {
+    SFX.setTrack('story');
     hideSetupPanels();
     const panel = $('story-panel');
     panel.style.display = 'block';
@@ -188,7 +191,7 @@ const STORY = {
                 { label: 'Not yet', cls: 'btn-plain', value: false }],
     });
     if (go) this.play(prog, i);
-    else SFX.setTrack('menu');
+    else SFX.setTrack('story');
   },
 
   play(prog, i) {
@@ -301,7 +304,7 @@ const STORY = {
 
   // Back from the table to the setup screen
   leaveGame() {
-    SFX.setTrack('menu');
+    SFX.setTrack('story');   // back on the tour map
     G = null;
     busy = false;
     viewerIdx = null;

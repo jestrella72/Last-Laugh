@@ -669,6 +669,7 @@ function hideSetupPanels() {
 }
 
 function backToMenu() {
+  SFX.setTrack('menu');
   hideSetupPanels();
   $('setup-count').style.display = 'block';
 }
