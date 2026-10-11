@@ -92,7 +92,7 @@ const STORY = {
       }
       return {
         opp: CHARACTER_CARDS.find(c => c.id === id),
-        botLives: i < 4 ? 2 : 3,
+        botLives: i === 0 ? 1 : i < 4 ? 2 : 3,   // level 1 is a warm-up: just 1 life
         bonusCards: Math.floor(t * 3),          // 0 → 2 extra cards
         bonusUses: i >= 7 ? 1 : 0,
         skill: +(0.6 + 0.4 * t).toFixed(2),     // how often the bot makes the smart play
@@ -185,7 +185,7 @@ const STORY = {
       title: lv.opp.name, single: true,
       cards: [{ card: lv.opp }],
       html: `<p class="story-taunt">“${esc(STORY_TAUNTS[lv.opp.id])}”</p>
-             <p>${esc(lv.opp.name)} has <b>${lv.botLives} lives</b>${lv.bonusCards ? `, <b>+${lv.bonusCards} bonus cards</b>` : ''}${lv.bonusUses ? `, <b>+${lv.bonusUses} ability uses</b>` : ''}. You have 3 lives.</p>
+             <p>${esc(lv.opp.name)} has <b>${lv.botLives} ${lv.botLives === 1 ? 'life' : 'lives'}</b>${lv.bonusCards ? `, <b>+${lv.bonusCards} bonus cards</b>` : ''}${lv.bonusUses ? `, <b>+${lv.bonusUses} ability uses</b>` : ''}. You have 3 lives.</p>
              ${prog.lastChance ? '<p class="story-warning">⚠️ LAST CHANCE! Lose this one and the story starts over from level 1.</p>' : ''}`,
       buttons: [{ label: lv.boss ? '😈 Face the boss!' : '🥊 Fight!', cls: 'btn-red btn-big', value: true },
                 { label: 'Not yet', cls: 'btn-plain', value: false }],
