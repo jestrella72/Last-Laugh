@@ -241,7 +241,6 @@ const STORY = {
       }
       prog.lastChance = false;   // a fresh retry for the next level
       this.save(prog);
-      await playStoryScene(levels[this.level].opp.id);   // a picture for some opponents (scenes.js)
       if (last) {
         const leo = CHARACTER_CARDS.find(c => c.id === STORY_BOSS);
         const fresh = !leo.isUnlocked;
@@ -257,7 +256,9 @@ const STORY = {
       const v = await askLocal({
         kicker: '🎉 Level cleared!', title: `You beat ${levels[this.level].opp.name}!`,
         cards: [{ card: next.opp }], single: true,
-        body: `Next up: ${next.boss ? 'the FINAL BOSS, ' : next.mini ? 'the MINI-BOSS, ' : ''}${next.opp.name}.`,
+        // picture first (for opponents that have one, see scenes.js), then the next-up line
+        html: storySceneHTML(levels[this.level].opp.id, true) +
+              `<p>Next up: ${next.boss ? 'the FINAL BOSS, ' : next.mini ? 'the MINI-BOSS, ' : ''}${esc(next.opp.name)}.</p>`,
         buttons: [{ label: `▶ Next: ${next.opp.name}`, cls: 'btn-yellow btn-big', value: 'next' },
                   { label: 'Story map', cls: 'btn-plain', value: 'map' }],
       });

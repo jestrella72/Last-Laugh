@@ -18,16 +18,23 @@ const STORY_SCENES = {
   },
 };
 
+// The picture itself (null if this opponent has none). Story mode puts it
+// on the "Level cleared!" screen right after the win.
+function storySceneHTML(id, small = false) {
+  const s = STORY_SCENES[id];
+  if (!s) return '';
+  return `<div class="scene-wrap${small ? ' small' : ''}">
+            <img src="${s.img}?v=41" alt="${s.alt}">
+            ${s.caption ? `<div class="scene-cap">${s.caption}</div>` : ''}
+          </div>`;
+}
+
+// Stand-alone pop-up (used by the ?scene= preview)
 async function playStoryScene(id) {
   const s = STORY_SCENES[id];
   if (!s) return;
   await askLocal({
-    kicker: s.kicker,
-    title: s.title,
-    html: `<div class="scene-wrap">
-             <img src="${s.img}?v=41" alt="${s.alt}">
-             ${s.caption ? `<div class="scene-cap">${s.caption}</div>` : ''}
-           </div>`,
+    kicker: s.kicker, title: s.title, html: storySceneHTML(id),
     buttons: [{ label: 'Continue ▶', cls: 'btn-yellow btn-big', value: true }],
   });
 }
