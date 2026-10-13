@@ -16,6 +16,11 @@ const STORY_SCENES = {
     img: 'images/casey-defeat.webp', alt: 'Cautious Casey lying flat on the pavement, seeing stars, while her scared twin looks on',
     caption: '',
   },
+  c_pete: {
+    kicker: 'Prankster Pete is out!', title: '🥧 Pie to the face',
+    img: 'images/pete-defeat.webp', alt: 'Prankster Pete getting a cream pie to the face from a boxing glove, his hat flying off',
+    caption: '',
+  },
 };
 
 // The picture itself (null if this opponent has none). Story mode puts it
@@ -24,7 +29,7 @@ function storySceneHTML(id, small = false) {
   const s = STORY_SCENES[id];
   if (!s) return '';
   return `<div class="scene-wrap${small ? ' small' : ''}">
-            <img src="${s.img}?v=41" alt="${s.alt}">
+            <img src="${s.img}?v=42" alt="${s.alt}">
             ${s.caption ? `<div class="scene-cap">${s.caption}</div>` : ''}
           </div>`;
 }
