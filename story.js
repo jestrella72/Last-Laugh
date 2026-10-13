@@ -241,7 +241,7 @@ const STORY = {
       }
       prog.lastChance = false;   // a fresh retry for the next level
       this.save(prog);
-      if (levels[this.level].opp.id === 'c_carl') await playCarlDefeat();
+      await playStoryScene(levels[this.level].opp.id);   // a picture for some opponents (scenes.js)
       if (last) {
         const leo = CHARACTER_CARDS.find(c => c.id === STORY_BOSS);
         const fresh = !leo.isUnlocked;
