@@ -21,6 +21,11 @@ const STORY_SCENES = {
     img: 'images/nina-defeat.webp', alt: 'Naive Nina in handcuffs, dragged off by two police pigs, a dropped bag of money on the pavement',
     caption: '',
   },
+  c_bella: {
+    kicker: 'Bold Bella is out!', title: '🪢 Caught in the net',
+    img: 'images/bella-defeat.webp', alt: 'Bold Bella the bunny dangling in a rope net from a tree branch, kicking and shouting',
+    caption: '',
+  },
   c_luke: {
     kicker: 'Lucky Luke is out!', title: '💸 Out of luck',
     img: 'images/luke-defeat.webp', alt: 'Lucky Luke tumbling off the pier as a shark leaps up with its jaws open, dollar bills flying',
@@ -79,7 +84,7 @@ function storySceneHTML(id, small = false) {
   const s = STORY_SCENES[id];
   if (!s) return '';
   return `<div class="scene-wrap${small ? ' small' : ''}">
-            <img src="${s.img}?v=44" alt="${s.alt}">
+            <img src="${s.img}?v=45" alt="${s.alt}">
             ${s.caption ? `<div class="scene-cap">${s.caption}</div>` : ''}
           </div>`;
 }
