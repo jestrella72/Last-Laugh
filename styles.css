@@ -986,3 +986,6 @@ body.t-lock { overflow: hidden; }
   animation: sceneCap .5s .6s ease-out both; }
 @keyframes sceneCap { from { opacity: 0; transform: translateY(14px) scale(.9); } }
 @media (prefers-reduced-motion: reduce) { .scene-cap { animation: none; } }
+
+#winner-scene .scene-wrap { margin: 12px auto; }
+#winner-scene .scene-wrap img { max-height: min(40vh, 360px); max-height: min(40dvh, 360px); }

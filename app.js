@@ -2202,6 +2202,8 @@ function showWinner(force = false) {
   SFX.fanfare();
   $('winner-title').textContent = `${w.name} gets the Last Laugh!`;
   $('winner-img').src = w.character.image;
+  $('winner-scene').innerHTML = '';
+  $('winner-card').style.display = '';
   $('winner-msg').textContent = `Playing as ${w.character.name} with ${w.lives} ${w.lives === 1 ? 'life' : 'lives'} left.`;
   const s = $('winner-screen');
   s.classList.add('open');

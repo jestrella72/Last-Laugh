@@ -246,6 +246,9 @@ const STORY = {
         const fresh = !leo.isUnlocked;
         leo.unlock();
         showWinner(true);
+        // the boss's defeat picture takes the place of the hero card (scenes.js)
+        $('winner-scene').innerHTML = storySceneHTML(levels[this.level].opp.id, true);
+        $('winner-card').style.display = $('winner-scene').innerHTML ? 'none' : '';
         $('winner-title').textContent = '🏆 YOU GOT THE LAST LAUGH!';
         $('winner-msg').textContent = `${prog.name} beat all ${levels.length} opponents, final boss included. Legend!` +
           (fresh ? ' 🔓 Leo the Lion is unlocked: pick him in any game!' : '');
